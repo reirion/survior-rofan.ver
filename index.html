@@ -3,8 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>픽셀 서바이버즈 v12</title>
+    <title>로판 세계는 오늘도 마물 퇴치중</title>
     <style>
+       /* 강원교육새음체 */
+       @font-face {
+           font-family: 'GangwonEducationSaeum';
+           src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2201-2@1.0/GangwonEduSaeeum_OTFMediumA.woff') format('woff');
+           font-weight: normal;
+           font-display: swap;
+        }
+       /* 승리의 그날까지 체 (제작자 공식 분할 웹폰트: 글자 범위별로 필요한 조각만 받아옴) */
+       @font-face {
+           font-family: 'TillVictoryComes';
+           src: url('https://cdn.jsdelivr.net/gh/tillvictorycomes/TillVictoryComes-font/tillvictorycomes-Regular-latin.woff') format('woff');
+           font-weight: normal;
+           font-style: normal;
+           font-display: swap;
+           unicode-range: U+0020-007E, U+00A0-00FF, U+2000-206F, U+20A0-20CF;
+       }
+       @font-face {
+           font-family: 'TillVictoryComes';
+           src: url('https://cdn.jsdelivr.net/gh/tillvictorycomes/TillVictoryComes-font/tillvictorycomes-Regular-hcore.woff') format('woff');
+           font-weight: normal;
+           font-style: normal;
+           font-display: swap;
+           unicode-range: U+1100-11FF, U+3130-318F;
+       }
+       @font-face {
+           font-family: 'TillVictoryComes';
+           src: url('https://cdn.jsdelivr.net/gh/tillvictorycomes/TillVictoryComes-font/tillvictorycomes-Regular-hsyll-a.woff') format('woff');
+           font-weight: normal;
+           font-style: normal;
+           font-display: swap;
+           unicode-range: U+AC00-C0FF;
+       }
+       @font-face {
+           font-family: 'TillVictoryComes';
+           src: url('https://cdn.jsdelivr.net/gh/tillvictorycomes/TillVictoryComes-font/tillvictorycomes-Regular-hsyll-b.woff') format('woff');
+           font-weight: normal;
+           font-style: normal;
+           font-display: swap;
+           unicode-range: U+C100-D0FF;
+       }
+       @font-face {
+           font-family: 'TillVictoryComes';
+           src: url('https://cdn.jsdelivr.net/gh/tillvictorycomes/TillVictoryComes-font/tillvictorycomes-Regular-hsyll-c.woff') format('woff');
+           font-weight: normal;
+           font-style: normal;
+           font-display: swap;
+           unicode-range: U+D100-D7A3;
+       }
+       /* HS산토끼체 */
+       @font-face {
+       font-family: 'HsSantoki';
+       src: url('https://gcore.jsdelivr.net/gh/projectnoonnu/noonfonts_2201-2@1.0/HS-Regular.woff') format('woff');
+       font-weight: normal;
+       font-display: swap;
+       }
+
         * {
             box-sizing: border-box;
             user-select: none;
@@ -27,7 +83,7 @@
         /* 게임 화면은 800x600 (+테두리) 고정 크기로 만들고, JS(fitGame)가 화면 크기에 맞춰 축소/확대합니다.
            left/top 50% + translate(-50%,-50%) 로 항상 정중앙에 놓입니다. */
         #game-container {
-            position: fixed;
+            position: fixed;  
             left: 50%;
             top: 50%;
             width: 808px;
@@ -117,19 +173,53 @@
         .btn:hover {
             transform: scale(1.06);
         }
-        #announcement {
-            position: absolute;
-            top: 18%;
-            width: 100%;
+
+        .game-title {
+            font-family: 'TillVictoryComes', serif;
+            font-size: 38px;
+            font-weight: normal;
             text-align: center;
-            font-size: 28px;
-            font-weight: bold;
-            color: #ff3366;
-            text-shadow: 0 0 12px #ff0055, 0 0 24px #ff0055;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.5s ease;
+            color: #ffe7ad;
+            margin-bottom: 10px;
+            line-height: 1.5;
+            text-shadow:
+               2px 2px 0 #38213f,
+               0 0 12px rgba(255, 220, 150, 0.65);
         }
+
+    /* 안내 문구 폰트 수정했음 */   
+    #announcement {
+    position: absolute;
+    top: 18%;
+    width: 100%;
+    padding: 0 12px;
+    box-sizing: border-box;
+    text-align: center;
+    z-index: 20;
+
+    font-family: 'HsSantoki', sans-serif;
+    font-size: clamp(22px, 2.5vw, 26px);
+    font-weight: normal;
+    line-height: 1.5;
+
+    color: #ffe7ad;
+    -webkit-text-stroke: 0.4px #80552c;
+    text-shadow:
+        2px 2px 0 #38213f,
+        -1px -1px 0 #38213f,
+        0 0 10px rgba(255, 220, 150, 0.45);
+
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+}
+
+        /* 캐릭터 선택 대사에만 강원교육새음체 적용 */
+        #announcement.character-announce {
+        font-family: 'GangwonEducationSaeum', sans-serif;
+        font-weight: normal;
+}
+
         #character-select-modal {
             box-sizing: border-box;
             padding: 18px;
@@ -248,6 +338,7 @@
             #end-run-btn { font-size: 18px; padding: 12px 24px; }
         }
     </style>
+
 </head>
 <body>
 
@@ -265,8 +356,8 @@
 
     <!-- Start Modal -->
     <div id="start-modal" class="modal">
-        <h1 style="font-size: 44px; color: #00ffcc; margin-bottom: 10px; text-shadow: 0 0 16px #00ffcc;">⚔️ PIXEL SURVIVORS</h1>
-        <p style="color: #aaa; margin-bottom: 30px;">원하는 캐릭터를 골라 생존하고 진화하세요!</p>
+    <h1 class="game-title" style="font-size: 44px; color: #00ffcc; margin-bottom: 10px; text-shadow: 0 0 16px #00ffcc; padding: 0 16px;">로판 세계는 오늘도 마물 퇴치중</h1>
+        <p style="color: #aaa; margin-bottom: 30px;">원하는 캐릭터를 골라 마물을 퇴치하세요!</p>
         <div class="coin-label">🪙 보유 코인: <span class="coin-count">0</span></div>
         <div class="btn-row">
             <button class="btn" onclick="openCharacterSelect()">게임 시작</button>
@@ -325,6 +416,32 @@ laserBeamImg.src = 'images/laser_beam.png';
 
 const laserHitImg = new Image();
 laserHitImg.src = 'images/laser_hit.png';
+
+// ===== 배경 설정 =====
+// 0번: 시작 배경 / 1~4번: 10, 20, 30, 40레벨 보스를 처치할 때마다 차례로 바뀜
+const BG_FILES = [
+    'images/backg_1.png',
+    'images/backg_2.png',
+    'images/backg_3.png',
+    'images/backg_4.png',
+    'images/backg_5.png'
+];
+const bgImages = BG_FILES.map(src => { const img = new Image(); img.src = src; return img; });
+
+// 배경 한 장(타일)을 게임 속에서 그릴 크기(px). 이미지 원본은 1254x1254 입니다.
+// 숫자가 클수록 배경이 크게 보이고(화면에 일부만 보임), 작을수록 작게 보이며 더 자주 반복됩니다.
+const BG_TILE_SIZE = 1254;
+// true: 타일을 좌우/상하로 뒤집어 이어 붙여서 이음새가 절대 티 나지 않음 (추천)
+// false: 같은 방향으로 그대로 반복 (이미지 자체가 이음새 없이 반복되도록 만들어졌을 때)
+const BG_MIRROR_TILES = true;
+// 배경을 어둡게 눌러 캐릭터/적이 더 잘 보이게 함 (0 = 원본 그대로, 0.3 = 30% 어둡게)
+const BG_DIM = 0.4;
+// 배경이 바뀔 때 부드럽게 전환되는 시간(초)
+const BG_FADE_SECONDS = 1.5;
+
+let bgStage = 0;       // 현재 배경 번호
+let bgPrevStage = 0;   // 전환 중 이전 배경 번호
+let bgFade = 1;        // 1이면 전환 완료
 
 // 회오리 이미지 불러오기 (images/spin_1.png)
 const tornadoImg = new Image();
@@ -452,16 +569,16 @@ function isSkillAvailable(skill) {
 }
 
 const SKILLS = [
-    { id: 'laser', title: '레이저', icon: '⚡', desc: '이동 방향으로 관통 레이저 발사. (최대 Lv.13 / 13레벨이 되면 360도 레이저 방어막)' },
+    { id: 'laser', title: '레이저', icon: '⚡', desc: '이동 방향으로 관통 레이저 발사. (최대 Lv.13 / 13레벨이 되면 360도)' },
     { id: 'bomb', title: '폭탄', icon: '💣', desc: '3초마다 주변에 공격력의 70% 광역 데미지. (레벨당 범위 +10%, 최대 Lv.13)' },
     { id: 'chain', title: '번개', icon: '🌩️', desc: '탄환 적중 시 주변 적 연쇄 번개. (레벨당 확률+5%, 데미지+3%, 연쇄+1, 최대 Lv.13)' },
     { id: 'tornado', title: '회오리', icon: '🌪️', desc: '주변을 맴돌며 50% 지속 데미지. (레벨당 개수+1, 속도&데미지 +5%)' },
     { id: 'magnet', title: '자석 강화', icon: '🧲', desc: '경험치 조각을 끌어당기는 자석 흡수 범위가 대폭 확장됩니다.' },
     { id: 'bullet', title: '투사체 증가', icon: '🏹', desc: '발사되는 탄환의 개수가 +1개 증가합니다.' },
     { id: 'pierce', title: '관통력 증가', icon: '🗡️', desc: '탄환이 적을 뚫고 지나가는 횟수가 +1회 증가합니다.' },
-    { id: 'speed', title: '공격 속도', icon: '⚡', desc: '모든 공격의 발사 속도가 20% 빨라집니다.' },
-    { id: 'power', title: '공격력 증가', icon: '🔥', desc: '플레이어의 전체 공격력이 25% 증가합니다.' },
-    { id: 'movespeed', title: '이동 속도', icon: '👟', desc: '플레이어의 이동 속도가 15% 증가합니다.' },
+    { id: 'speed', title: '공격 속도', icon: '⚡', desc: '모든 공격의 발사 속도가 10% 빨라집니다.' },
+    { id: 'power', title: '공격력 증가', icon: '🔥', desc: '플레이어의 전체 공격력이 10% 증가합니다.' },
+    { id: 'movespeed', title: '이동 속도', icon: '👟', desc: '플레이어의 이동 속도가 5% 증가합니다.' },
     { id: 'crit', title: '치명타 확률', icon: '🎯', desc: '모든 공격의 치명타 확률이 +5% 증가합니다. (최대 100%)' },
     { id: 'critdmg', title: '치명타 피해', icon: '💢', desc: '치명타 피해가 +10% 증가합니다. (치명타 기본 2배)' }
 ];
@@ -472,12 +589,31 @@ window.addEventListener('keydown', e => {
     if (e.key.toLowerCase() === 'h' && !e.repeat && (gameState === 'PLAYING')) toggleStats();
 });
 
-function showAnnouncement(text, duration = 2500) {
+//안내문구 폰트 바꾸려고 수정한 곳
+function showAnnouncement(text, duration = 2500, isCharacter = false) {
     const el = document.getElementById('announcement');
-    el.innerText = text;
+
+    if (!el) {
+        console.error('announcement 요소를 찾을 수 없습니다.');
+        return;
+    }
+
+    // 캐릭터 선택 대사에만 전용 폰트 적용
+    el.classList.toggle('character-announce', isCharacter);
+
+    // 이전 타이머 정리
+    if (el._announcementTimer) {
+        clearTimeout(el._announcementTimer);
+    }
+
+    el.textContent = text;
     el.style.opacity = '1';
-    setTimeout(() => { el.style.opacity = '0'; }, duration);
+
+    el._announcementTimer = setTimeout(() => {
+        el.style.opacity = '0';
+    }, duration);
 }
+
 
 function openCharacterSelect() {
     document.getElementById('start-modal').classList.add('hidden');
@@ -491,30 +627,30 @@ const CHARACTERS = {
     p1: {
         name: '공듀', icon: '👸🏼', image: 'images/player1.png',
         attackMult: 1.10, attackSpeed: 0.85, moveMult: 1.0, pierce: 1,
-        splash: true, splashRadius: 1.0, crit: 0, startSkills: { bomb: 1 }, cardChoices: 3,
+        splash: true, splashRadius: 1.1, crit: 0, startSkills: { bomb: 1 }, cardChoices: 3,
         ability: '💥 공격력 +10% / 광역 공격 / 시작 스킬 💣 폭탄', drawback: '공격 속도 15% 감소',
-        announce: '공격력 +10% / 광역 공격 / 폭탄 보유'
+        announce: '빨리 처리하고 밥 먹자'
     },
     p2: {
         name: '완댜', icon: '🫅🏼', image: 'images/player2.png',
         attackMult: 0.88, attackSpeed: 1.20, moveMult: 1.0, pierce: 2,
         splash: false, splashRadius: 1.0, crit: 0.10, startSkills: {}, cardChoices: 3,
         ability: '🏹 공격 속도 +20% / 관통 +1 / 치명타 10% (2배)', drawback: '공격력 12% 감소',
-        announce: '공격 속도 +20% / 관통 +1 / 치명타 10%'
+        announce: '이 몸이 해결하겠다'
     },
     p3: {
         name: '법사', icon: '🧙🏻', image: 'images/player3.png',
         attackMult: 0.95, attackSpeed: 1.0, moveMult: 1.15, pierce: 1,
         splash: true, splashRadius: 1.30, crit: 0, startSkills: { chain: 1 }, cardChoices: 3,
-        ability: '✨ 광역 범위 +30% / 이동 +15% / 시작 스킬 🌩️ 연쇄 전격', drawback: '공격력 5% 감소',
-        announce: '광역 범위 +30% / 이동 +15% / 연쇄 전격 보유'
+        ability: '✨ 광역 범위 +30% / 이동 +15% / 시작 스킬 🌩️ 번개', drawback: '공격력 5% 감소',
+        announce: '후.. 귀찮은 일이 생겼군요'
     },
     p4: {
         name: '애옹', icon: '🐈', image: 'images/player4.png',
         attackMult: 1.15, attackSpeed: 1.0, moveMult: 1.20, pierce: 1,
         splash: false, splashRadius: 1.0, crit: 0, startSkills: {}, cardChoices: 4,
         ability: '🐟 공격력 +15% / 이동 +20% / 🍀 레벨업 카드 4장 중 선택', drawback: '시작 스킬 없음 (초반이 약함)',
-        announce: '공격력 +15% / 이동 +20% / 카드 4장 중 선택'
+        announce: '잡아줄테니 걱정말라냥'
     }
 };
 
@@ -551,7 +687,7 @@ function applyCharacterStats(charType) {
     Object.entries(c.startSkills).forEach(([id, lv]) => { player[id + 'Level'] = lv; });
 
     applyMetaUpgrades();   // 영구 강화 반영 (캐릭터 기본값 위에 곱/합산)
-    showAnnouncement(`${c.icon} ${c.name} 선택! ${c.announce}`);
+    showAnnouncement(CHARACTERS[charType].announce, 2500, true);
 }
 
 function startRun(charType) {
@@ -589,6 +725,7 @@ function resetGame() {
     killCount = 0;
     bossKills = 0;
     clearSnapshot = null;
+    bgStage = 0; bgPrevStage = 0; bgFade = 1;
     document.getElementById('end-run-btn').classList.add('hidden');
     itemSpawnTimer = 0;
 
@@ -636,6 +773,7 @@ function gameLoop(timestamp) {
 function update(dt) {
     gameTime += dt;
     if (player.invincibleTimer > 0) player.invincibleTimer -= dt;
+    if (bgFade < 1) bgFade = Math.min(1, bgFade + dt / BG_FADE_SECONDS);
 
     let dx = 0, dy = 0;
     if (keys['w'] || keys['arrowup']) dy -= 1;
@@ -773,10 +911,10 @@ function checkBossMilestone() {
 
 function spawnBoss(levelTier) {
     let bossNames = {
-        10: "1차 진화 보스 (돌격형)",
-        20: "2차 진화 보스 (탄막 사격형)",
-        30: "3차 진화 보스 (강력 탄막형)",
-        40: "최종 수호자 보스 (궁극형)"
+        10: "악령이 된 기사",
+        20: "타락한 마법사",
+        30: "죽지 않는 초대왕",
+        40: "전직 수호자"
     };
     showAnnouncement(`⚠️ [Lv.${levelTier}] ${bossNames[levelTier]} 등장! ⚠️`);
 
@@ -1406,17 +1544,18 @@ function updateEnemies(dt) {
 }
 
 function handleBossRewards(level) {
+    setBackgroundStage(level / 10);   // 10/20/30/40레벨 보스 처치 → 배경 2/3/4/5번
     if (level === 10) {
         player.hp = Math.min(player.maxHp, player.hp + 20);
         addExp(player.maxExp * 0.10);
-        showAnnouncement("🎉 10레벨 보스 처치! HP 20 회복 & EXP 10% 획득!");
+        showAnnouncement("🎉 보스 처치! HP 20 회복 & EXP 10% 획득!");
     } else if (level === 20) {
         player.hp = Math.min(player.maxHp, player.hp + 20);
         addExp(player.maxExp * 0.15);
-        showAnnouncement("🎉 20레벨 보스 처치! HP 20 회복 & EXP 15% 획득!");
+        showAnnouncement("🎉 보스 처치! HP 20 회복 & EXP 15% 획득!");
     } else if (level === 30) {
         player.hp = Math.min(player.maxHp, player.hp + 25);
-        showAnnouncement("🎉 30레벨 보스 처치! HP 25 회복 & 무료 스킬 선택권!");
+        showAnnouncement("🎉 보스 처치! HP 25 회복 & 무료 스킬 선택!");
         triggerLevelUp();
     } else if (level === 40) {
         player.hp = Math.min(player.maxHp, player.hp + 30);
@@ -1514,12 +1653,12 @@ function selectSkill(id) {
     if (id === 'bomb') player.bombLevel = Math.min(13, player.bombLevel + 1);
     if (id === 'chain') player.chainLevel = Math.min(13, player.chainLevel + 1);
     if (id === 'tornado') player.tornadoLevel++;
-    if (id === 'magnet') player.magnetRange += 90;
+    if (id === 'magnet') player.magnetRange += 50;
     if (id === 'bullet') player.bulletCount++;
     if (id === 'pierce') player.pierceCount++;
-    if (id === 'speed') player.attackSpeedRatio *= 1.2;
-    if (id === 'power') player.attackPower *= 1.25;
-    if (id === 'movespeed') player.speed *= 1.15;
+    if (id === 'speed') player.attackSpeedRatio *= 1.1;
+    if (id === 'power') player.attackPower *= 1.1;
+    if (id === 'movespeed') player.speed *= 1.05;
     if (id === 'crit') player.critChance = Math.min(1, player.critChance + 0.05);
     if (id === 'critdmg') player.critDamage += 10;
 
@@ -1534,7 +1673,7 @@ function render() {
     ctx.save();
     ctx.translate(-camera.x, -camera.y);
 
-    drawGrid();
+    drawBackground();
 
     // 경험치 조각 그리기
     expGems.forEach(g => {
@@ -1624,11 +1763,11 @@ function render() {
     ctx.rotate(l.angle);
 
     // 1. 바깥쪽 에너지 빛
-    ctx.globalAlpha = 0.15;
+    ctx.globalAlpha = 0.0;
     ctx.fillStyle = '#00ccff';
     ctx.shadowColor = '#00ccff';
-    ctx.shadowBlur = 48;
-    ctx.fillRect(0, -l.width, l.length, l.width * 0.5);
+    ctx.shadowBlur = 0;
+    ctx.fillRect(0, -l.width, l.length, l.width * 0.01);
 
     // 2. PNG 광선
     ctx.globalAlpha = 0.55;
@@ -1758,6 +1897,58 @@ function drawPlayerSprite() {
     ctx.imageSmoothingEnabled = SPRITE_SMOOTHING;
     if (SPRITE_SMOOTHING) ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(playerImg, player.x - w / 2, player.y - h / 2, w, h);
+    ctx.restore();
+}
+
+function setBackgroundStage(stage) {
+    if (stage === bgStage || stage < 0 || stage >= bgImages.length) return;
+    bgPrevStage = bgStage;
+    bgStage = stage;
+    bgFade = 0;
+}
+
+function bgReady(i) {
+    const im = bgImages[i];
+    return !!im && im.complete && im.naturalWidth > 0;
+}
+
+// 월드 좌표에 타일을 깔아서 어디로 가도 배경이 끊기지 않고 계속 이어지게 그립니다.
+function drawBgLayer(img) {
+    const S = BG_TILE_SIZE;
+    const tx0 = Math.floor(camera.x / S), tx1 = Math.floor((camera.x + canvas.width) / S);
+    const ty0 = Math.floor(camera.y / S), ty1 = Math.floor((camera.y + canvas.height) / S);
+
+    for (let ty = ty0; ty <= ty1; ty++) {
+        for (let tx = tx0; tx <= tx1; tx++) {
+            const flipX = BG_MIRROR_TILES && (((tx % 2) + 2) % 2 === 1);
+            const flipY = BG_MIRROR_TILES && (((ty % 2) + 2) % 2 === 1);
+            ctx.save();
+            ctx.translate(tx * S + (flipX ? S : 0), ty * S + (flipY ? S : 0));
+            ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+            ctx.drawImage(img, 0, 0, S + 1, S + 1);   // +1px: 타일 사이 실선 방지
+            ctx.restore();
+        }
+    }
+}
+
+function drawBackground() {
+    if (!bgReady(bgStage)) { drawGrid(); return; }   // 이미지가 없으면 기존 격자 배경
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    if (bgFade < 1 && bgReady(bgPrevStage)) {
+        drawBgLayer(bgImages[bgPrevStage]);
+        ctx.globalAlpha = bgFade;
+    }
+    drawBgLayer(bgImages[bgStage]);
+    ctx.globalAlpha = 1;
+
+    if (BG_DIM > 0) {
+        ctx.fillStyle = `rgba(0, 0, 0, ${BG_DIM})`;
+        ctx.fillRect(camera.x, camera.y, canvas.width, canvas.height);
+    }
     ctx.restore();
 }
 
@@ -1977,10 +2168,10 @@ function finishRun() {
 function calcRunReward() {
     const s = getRunStats();
     const parts = {
-        time:  Math.floor(s.time / 10),          // 6초당 1코인
-        kills: Math.floor(s.kills / 10),  // 8마리당 1코인
+        time:  Math.floor(s.time / 10),          // 10초당 1코인
+        kills: Math.floor(s.kills / 10),  // 10마리당 1코인
         level: s.level * 2,           // 레벨당 2코인
-        boss:  s.bossKills * 30              // 보스 1마리당 25코인
+        boss:  s.bossKills * 30              // 보스 1마리당 30코인
     };
     const sub = parts.time + parts.kills + parts.level + parts.boss;
     const mult = 1 + 0.10 * upLv('coin');
@@ -2196,6 +2387,13 @@ function renderTouchUI() {
     ctx.arc(joystick.knobX, joystick.knobY, 24, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
+}
+
+// 폰트 미리 불러오기: 처음 나오는 멘트/제목이 기본 글꼴로 보였다가 바뀌는 현상을 줄입니다.
+if (document.fonts && document.fonts.load) {
+    document.fonts.load("38px 'TillVictoryComes'", '로판 세계는 오늘도 마물 퇴치중 ABC');
+    document.fonts.load("26px 'GangwonEducationSaeum'", '빨리 처리하고 밥 먹자 이 몸이 해결하겠다 후 귀찮은 일이 생겼군요 잡아줄테니 걱정말라냥');
+    document.fonts.load("26px 'HsSantoki'", '보스 처치 HP 회복 필드 아이템 획득 등장 부활 하트 자석 무적');
 }
 
 // 초기 화면 구성
