@@ -2,8 +2,8 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>픽셀 서바이버즈 v11</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>픽셀 서바이버즈 v12</title>
     <style>
         * {
             box-sizing: border-box;
@@ -15,14 +15,25 @@
             background-color: #0d0d18;
             color: #fff;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
+            width: 100%;
+            height: 100%;
             overflow: hidden;
+            overscroll-behavior: none;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
         }
+        html { width: 100%; height: 100%; overflow: hidden; background-color: #0d0d18; }
+        /* 게임 화면은 800x600 (+테두리) 고정 크기로 만들고, JS(fitGame)가 화면 크기에 맞춰 축소/확대합니다.
+           left/top 50% + translate(-50%,-50%) 로 항상 정중앙에 놓입니다. */
         #game-container {
-            position: relative;
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            width: 808px;
+            height: 608px;
+            transform: translate(-50%, -50%);
+            transform-origin: center center;
             box-shadow: 0 0 35px rgba(0, 255, 204, 0.25);
             border: 4px solid #252542;
             border-radius: 10px;
@@ -32,6 +43,7 @@
             display: block;
             background-color: #121220;
             image-rendering: pixelated;
+            touch-action: none;
         }
         .modal {
             position: absolute;
@@ -217,9 +229,33 @@
             box-shadow: 0 4px 14px rgba(255, 216, 74, 0.45);
         }
         #end-run-btn:hover { transform: scale(1.06); }
+
+        /* ===== v12 추가 스타일: 모바일 ===== */
+        #rotate-hint {
+            display: none; position: fixed; inset: 0; z-index: 100;
+            background: #0d0d18; color: #fff; text-align: center;
+            flex-direction: column; align-items: center; justify-content: center; padding: 24px;
+        }
+        #rotate-hint .icon { font-size: 64px; margin-bottom: 14px; }
+        #rotate-hint p { font-size: 18px; line-height: 1.5; margin: 0; }
+        #rotate-hint small { color: #aaa; font-size: 13px; margin-top: 8px; }
+        /* 터치 기기에서 세로로 들고 있으면 가로 모드 안내를 보여줍니다 */
+        @media (pointer: coarse) and (orientation: portrait) {
+            #rotate-hint { display: flex; }
+        }
+        @media (pointer: coarse) {
+            #stats-toggle { font-size: 15px; padding: 8px 14px; }
+            #end-run-btn { font-size: 18px; padding: 12px 24px; }
+        }
     </style>
 </head>
 <body>
+
+<div id="rotate-hint">
+    <div class="icon">📱↻</div>
+    <p>가로 모드로 돌려서<br>플레이해 주세요!</p>
+    <small>(자동 회전이 꺼져 있다면 켜 주세요)</small>
+</div>
 
 <div id="game-container">
     <canvas id="gameCanvas" width="800" height="600"></canvas>
@@ -396,10 +432,10 @@ let itemSpawnTimer = 0;
 
 const RAINBOW_TIERS = [
     { name: 'Red', color: '#ff3344', hp: 20, speedMult: 0.65, radius: 10, exp: 2 },
-    { name: 'Orange', color: '#ff8800', hp: 55, speedMult: 0.70, radius: 11, exp: 4 },
+    { name: 'Orange', color: '#ff8800', hp: 55, speedMult: 0.70, radius: 11, exp: 5 },
     { name: 'Yellow', color: '#ffe600', hp: 110, speedMult: 0.60, radius: 12, exp: 10 },
-    { name: 'Green', color: '#2ecc71', hp: 200, speedMult: 0.75, radius: 12, exp: 20 },
-    { name: 'Blue', color: '#3498db', hp: 340, speedMult: 0.68, radius: 13, exp: 40, isSplitter: true },
+    { name: 'Green', color: '#2ecc71', hp: 200, speedMult: 0.75, radius: 12, exp: 18 },
+    { name: 'Blue', color: '#3498db', hp: 340, speedMult: 0.68, radius: 13, exp: 30, isSplitter: true },
     { name: 'Indigo', color: '#8e44ad', hp: 550, speedMult: 0.72, radius: 14, exp: 60 },
     { name: 'Violet', color: '#e056fd', hp: 900, speedMult: 0.80, radius: 15, exp: 100 }
 ];
@@ -424,7 +460,7 @@ const SKILLS = [
     { id: 'bullet', title: '투사체 증가', icon: '🏹', desc: '발사되는 탄환의 개수가 +1개 증가합니다.' },
     { id: 'pierce', title: '관통력 증가', icon: '🗡️', desc: '탄환이 적을 뚫고 지나가는 횟수가 +1회 증가합니다.' },
     { id: 'speed', title: '공격 속도', icon: '⚡', desc: '모든 공격의 발사 속도가 20% 빨라집니다.' },
-    { id: 'power', title: '공격력 증가', icon: '🔥', desc: '플레이어의 전체 공격력이 15% 증가합니다.' },
+    { id: 'power', title: '공격력 증가', icon: '🔥', desc: '플레이어의 전체 공격력이 25% 증가합니다.' },
     { id: 'movespeed', title: '이동 속도', icon: '👟', desc: '플레이어의 이동 속도가 15% 증가합니다.' },
     { id: 'crit', title: '치명타 확률', icon: '🎯', desc: '모든 공격의 치명타 확률이 +5% 증가합니다. (최대 100%)' },
     { id: 'critdmg', title: '치명타 피해', icon: '💢', desc: '치명타 피해가 +10% 증가합니다. (치명타 기본 2배)' }
@@ -470,8 +506,8 @@ const CHARACTERS = {
         name: '법사', icon: '🧙🏻', image: 'images/player3.png',
         attackMult: 0.95, attackSpeed: 1.0, moveMult: 1.15, pierce: 1,
         splash: true, splashRadius: 1.30, crit: 0, startSkills: { chain: 1 }, cardChoices: 3,
-        ability: '✨ 광역 범위 +30% / 이동 +15% / 시작 스킬 🌩️ 번개', drawback: '공격력 5% 감소',
-        announce: '광역 범위 +30% / 이동 +15% / 번개 보유'
+        ability: '✨ 광역 범위 +30% / 이동 +15% / 시작 스킬 🌩️ 연쇄 전격', drawback: '공격력 5% 감소',
+        announce: '광역 범위 +30% / 이동 +15% / 연쇄 전격 보유'
     },
     p4: {
         name: '애옹', icon: '🐈', image: 'images/player4.png',
@@ -524,6 +560,7 @@ function startRun(charType) {
     autoAttackTimer = 0;
     bossSpawnedForLevel = 0;
     lastTime = 0;
+    resetJoystick();
     gameState = 'PLAYING';
     document.getElementById('stats-toggle').classList.remove('hidden');
     requestAnimationFrame(gameLoop);
@@ -586,8 +623,8 @@ function gameLoop(timestamp) {
     if (dt > 0.1) dt = 0.1;
     lastTime = timestamp;
 
-    if (gameState === 'PLAYING') {
-        update(dt);
+    if (gameState === 'PLAYING' && !isPortraitBlocked()) {
+        update(dt);   // 모바일 세로 모드일 때는 가로 모드 안내가 뜨는 동안 일시정지
     }
     render();
 
@@ -605,6 +642,11 @@ function update(dt) {
     if (keys['s'] || keys['arrowdown']) dy += 1;
     if (keys['a'] || keys['arrowleft']) dx -= 1;
     if (keys['d'] || keys['arrowright']) dx += 1;
+
+    // 모바일 가상 조이스틱 (키보드 입력이 없을 때 사용)
+    if (dx === 0 && dy === 0 && joystick.active && joystick.moving) {
+        dx = joystick.dx; dy = joystick.dy;
+    }
 
     if (dx !== 0 || dy !== 0) {
         let len = Math.hypot(dx, dy);
@@ -1472,11 +1514,11 @@ function selectSkill(id) {
     if (id === 'bomb') player.bombLevel = Math.min(13, player.bombLevel + 1);
     if (id === 'chain') player.chainLevel = Math.min(13, player.chainLevel + 1);
     if (id === 'tornado') player.tornadoLevel++;
-    if (id === 'magnet') player.magnetRange += 50;
+    if (id === 'magnet') player.magnetRange += 90;
     if (id === 'bullet') player.bulletCount++;
     if (id === 'pierce') player.pierceCount++;
     if (id === 'speed') player.attackSpeedRatio *= 1.2;
-    if (id === 'power') player.attackPower *= 1.15;
+    if (id === 'power') player.attackPower *= 1.25;
     if (id === 'movespeed') player.speed *= 1.15;
     if (id === 'crit') player.critChance = Math.min(1, player.critChance + 0.05);
     if (id === 'critdmg') player.critDamage += 10;
@@ -1758,6 +1800,7 @@ function renderHUD() {
     ctx.fillText(`💀 처치: ${killCount}`, 320, 33);
 
     if (showStats) renderStatsPanel();
+    renderTouchUI();
 }
 
 // 우측 상단 능력치 패널 (작은 흰 글씨). 📊 버튼 또는 H 키로 켜고 끕니다.
@@ -1785,7 +1828,7 @@ function renderStatsPanel() {
     const skillLines = [];
     if (player.laserLevel > 0)   skillLines.push(`⚡ 레이저 Lv.${player.laserLevel}${maxTag(player.laserLevel, 13)}`);
     if (player.bombLevel > 0)    skillLines.push(`💣 폭탄 Lv.${player.bombLevel}${maxTag(player.bombLevel, 13)}`);
-    if (player.chainLevel > 0)   skillLines.push(`🌩️ 번개 Lv.${player.chainLevel}${maxTag(player.chainLevel, 13)}`);
+    if (player.chainLevel > 0)   skillLines.push(`🌩️ 연쇄 전격 Lv.${player.chainLevel}${maxTag(player.chainLevel, 13)}`);
     if (player.tornadoLevel > 0) skillLines.push(`🌪️ 회오리 Lv.${player.tornadoLevel}`);
     if (skillLines.length) { lines.push('— 스킬 —'); lines.push(...skillLines); }
 
@@ -2043,7 +2086,120 @@ function resetSaveData() {
     renderShop();
 }
 
+// =====================================================================
+//  화면 크기 맞춤 (PC/모바일 공통) + 모바일 터치 조이스틱
+// =====================================================================
+const GAME_BOX_W = 808, GAME_BOX_H = 608;   // 캔버스 800x600 + 테두리 4px x 2
+const MAX_SCALE = 2;                         // 큰 모니터에서 최대 확대 배율
+
+function fitGame() {
+    const vv = window.visualViewport;
+    const w = vv ? vv.width : window.innerWidth;
+    const h = vv ? vv.height : window.innerHeight;
+    const s = Math.min(w / GAME_BOX_W, h / GAME_BOX_H, MAX_SCALE);
+    document.getElementById('game-container').style.transform = `translate(-50%, -50%) scale(${s})`;
+}
+window.addEventListener('resize', fitGame);
+window.addEventListener('orientationchange', () => setTimeout(fitGame, 200));
+if (window.visualViewport) window.visualViewport.addEventListener('resize', fitGame);
+
+function isPortraitBlocked() {
+    return window.matchMedia && window.matchMedia('(pointer: coarse) and (orientation: portrait)').matches;
+}
+
+const IS_TOUCH_DEVICE = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+
+// 화면을 터치한 곳에 조이스틱이 생기고, 드래그한 방향으로 이동합니다.
+const joystick = { active: false, id: null, baseX: 0, baseY: 0, knobX: 0, knobY: 0, dx: 0, dy: 0, moving: false };
+const JOY_RADIUS = 55;   // 조이스틱 반지름 (게임 화면 기준 px)
+const JOY_DEADZONE = 8;  // 이 거리보다 가까우면 움직이지 않음
+
+function resetJoystick() {
+    joystick.active = false; joystick.id = null; joystick.moving = false;
+    joystick.dx = 0; joystick.dy = 0;
+}
+
+function touchToCanvas(t) {
+    const r = canvas.getBoundingClientRect();
+    return {
+        x: (t.clientX - r.left) * (canvas.width / r.width),
+        y: (t.clientY - r.top) * (canvas.height / r.height)
+    };
+}
+
+function updateJoystick(p) {
+    const vx = p.x - joystick.baseX, vy = p.y - joystick.baseY;
+    const dist = Math.hypot(vx, vy);
+    joystick.moving = dist > JOY_DEADZONE;
+    if (dist > 0) { joystick.dx = vx / dist; joystick.dy = vy / dist; }
+    const k = Math.min(dist, JOY_RADIUS);
+    joystick.knobX = joystick.baseX + (dist > 0 ? (vx / dist) * k : 0);
+    joystick.knobY = joystick.baseY + (dist > 0 ? (vy / dist) * k : 0);
+}
+
+canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    if (joystick.active) return;
+    const t = e.changedTouches[0];
+    const p = touchToCanvas(t);
+    joystick.active = true;
+    joystick.id = t.identifier;
+    joystick.baseX = joystick.knobX = p.x;
+    joystick.baseY = joystick.knobY = p.y;
+    joystick.dx = joystick.dy = 0;
+    joystick.moving = false;
+}, { passive: false });
+
+canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    for (const t of e.changedTouches) {
+        if (t.identifier === joystick.id) updateJoystick(touchToCanvas(t));
+    }
+}, { passive: false });
+
+function endTouch(e) {
+    for (const t of e.changedTouches) {
+        if (t.identifier === joystick.id) resetJoystick();
+    }
+}
+canvas.addEventListener('touchend', endTouch);
+canvas.addEventListener('touchcancel', endTouch);
+
+// iOS 사파리 핀치 줌 방지
+['gesturestart', 'gesturechange', 'gestureend'].forEach(ev =>
+    document.addEventListener(ev, e => e.preventDefault()));
+
+// 조이스틱과 안내 문구 그리기 (화면 고정 좌표)
+function renderTouchUI() {
+    if (IS_TOUCH_DEVICE && gameTime < 8 && !joystick.active) {
+        ctx.save();
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#fff';
+        ctx.globalAlpha = Math.max(0, Math.min(1, (8 - gameTime) / 2));
+        ctx.shadowColor = 'rgba(0,0,0,0.9)';
+        ctx.shadowBlur = 3;
+        ctx.fillText('화면을 터치한 채로 드래그하면 이동해요', canvas.width / 2, canvas.height - 28);
+        ctx.restore();
+    }
+    if (!joystick.active) return;
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(joystick.baseX, joystick.baseY, JOY_RADIUS, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 0.55;
+    ctx.beginPath();
+    ctx.arc(joystick.knobX, joystick.knobY, 24, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+}
+
 // 초기 화면 구성
+fitGame();
 buildCharacterGrid();
 refreshCoinLabels();
 document.getElementById('stats-toggle').classList.toggle('off', !showStats);
