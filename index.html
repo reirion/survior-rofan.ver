@@ -337,8 +337,25 @@
             #stats-toggle { font-size: 15px; padding: 8px 14px; }
             #end-run-btn { font-size: 18px; padding: 12px 24px; }
         }
-    </style>
 
+        /* ===== v15 추가 스타일: 로딩 화면 ===== */
+        #loading-screen { z-index: 50; background: #0d0d18; backdrop-filter: none; }
+        #loading-screen h2 {
+            font-family: 'HsSantoki', sans-serif; font-weight: normal;
+            font-size: 32px; color: #ffe7ad; margin: 0 0 22px;
+            text-shadow: 2px 2px 0 #38213f, 0 0 12px rgba(255, 220, 150, 0.5);
+        }
+        #loading-bar {
+            width: min(420px, 80%); height: 14px; background: #1c1c36;
+            border: 2px solid #484880; border-radius: 10px; overflow: hidden;
+        }
+        #loading-fill {
+            width: 0%; height: 100%;
+            background: linear-gradient(90deg, #00ffcc, #ffe7ad);
+            transition: width 0.15s ease;
+        }
+        #loading-text { color: #aaa; font-size: 14px; margin: 12px 0 0; }
+    </style>
 </head>
 <body>
 
@@ -354,8 +371,15 @@
     <button id="stats-toggle" class="hidden" onclick="toggleStats(); this.blur();">📊 정보 (H)</button>
     <button id="end-run-btn" class="hidden" onclick="finishRun(); this.blur();">🏁 게임 종료</button>
 
+    <!-- Loading Screen: 이미지/폰트를 모두 받을 때까지 표시 -->
+    <div id="loading-screen" class="modal">
+        <h2>로딩중...</h2>
+        <div id="loading-bar"><div id="loading-fill"></div></div>
+        <p id="loading-text">0%</p>
+    </div>
+
     <!-- Start Modal -->
-    <div id="start-modal" class="modal">
+    <div id="start-modal" class="modal hidden">
     <h1 class="game-title" style="font-size: 44px; color: #00ffcc; margin-bottom: 10px; text-shadow: 0 0 16px #00ffcc; padding: 0 16px;">로판 세계는 오늘도 마물 퇴치중</h1>
         <p style="color: #aaa; margin-bottom: 30px;">원하는 캐릭터를 골라 마물을 퇴치하세요!</p>
         <div class="coin-label">🪙 보유 코인: <span class="coin-count">0</span></div>
@@ -408,7 +432,7 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false;
 
-const playerImg = new Image();
+let playerImg = new Image();   // 선택한 캐릭터의 (미리 불러둔) 이미지로 교체됩니다
 
 // 레이저 효과 이미지 불러오기
 const laserBeamImg = new Image();
@@ -704,8 +728,12 @@ function startRun(charType) {
 
 function selectCharacter(charType) {
     selectedCharType = charType;
-    playerImg.src = CHARACTERS[charType].image;
-    playerImg.onerror = () => console.warn('캐릭터 이미지 파일을 찾을 수 없습니다:', CHARACTERS[charType].image);
+    if (charImages[charType]) {
+        playerImg = charImages[charType];          // 로딩 화면에서 이미 받아둔 이미지
+    } else {
+        playerImg = new Image();
+        playerImg.src = CHARACTERS[charType].image;
+    }
     document.getElementById('character-select-modal').classList.add('hidden');
     startRun(charType);
 }
@@ -2389,11 +2417,81 @@ function renderTouchUI() {
     ctx.restore();
 }
 
-// 폰트 미리 불러오기: 처음 나오는 멘트/제목이 기본 글꼴로 보였다가 바뀌는 현상을 줄입니다.
-if (document.fonts && document.fonts.load) {
-    document.fonts.load("38px 'TillVictoryComes'", '로판 세계는 오늘도 마물 퇴치중 ABC');
-    document.fonts.load("26px 'GangwonEducationSaeum'", '빨리 처리하고 밥 먹자 이 몸이 해결하겠다 후 귀찮은 일이 생겼군요 잡아줄테니 걱정말라냥');
-    document.fonts.load("26px 'HsSantoki'", '보스 처치 HP 회복 필드 아이템 획득 등장 부활 하트 자석 무적');
+// =====================================================================
+//  로딩 화면: 이미지와 폰트를 모두 받은 뒤에 시작 화면을 보여줍니다
+// =====================================================================
+const LOAD_TIMEOUT_MS = 20000;   // 파일 하나가 이 시간(ms) 넘게 안 받아지면 기다리지 않고 진행
+const MIN_LOADING_MS = 400;      // 너무 빨리 끝나도 로딩 화면이 깜빡이지 않도록 최소 표시 시간
+const charImages = {};           // 캐릭터별로 미리 불러둔 이미지
+
+function waitForImage(img) {
+    return new Promise(resolve => {
+        if (img.complete) { resolve(); return; }          // 이미 받았거나(실패 포함) 끝난 경우
+        img.addEventListener('load', resolve, { once: true });
+        img.addEventListener('error', resolve, { once: true });   // 실패해도 게임은 진행 (대체 도형 사용)
+    });
+}
+
+function waitForFont(spec, sampleText) {
+    if (!(document.fonts && document.fonts.load)) return Promise.resolve();
+    return document.fonts.load(spec, sampleText).catch(() => {});
+}
+
+function startPreload() {
+    // 캐릭터 이미지는 선택 순간이 아니라 여기서 미리 받아 둡니다
+    Object.entries(CHARACTERS).forEach(([id, c]) => {
+        const im = new Image();
+        im.src = c.image;
+        charImages[id] = im;
+    });
+
+    const images = [
+        laserBeamImg, laserHitImg, tornadoImg,
+        expGemImg1, expGemImg2, expGemImg3,
+        ...bgImages,
+        ...Object.values(ENEMY_IMAGES).filter(Boolean),
+        ...Object.values(charImages)
+    ];
+    const fonts = [
+        ["38px 'TillVictoryComes'", '로판 세계는 오늘도 마물 퇴치중 ABC'],
+        ["26px 'GangwonEducationSaeum'", '빨리 처리하고 밥 먹자 이 몸이 해결하겠다 후 귀찮은 일이 생겼군요 잡아줄테니 걱정말라냥'],
+        ["26px 'HsSantoki'", '보스 처치 HP 회복 필드 아이템 획득 등장 부활 하트 자석 무적']
+    ];
+
+    const tasks = [
+        ...images.map(waitForImage),
+        ...fonts.map(([spec, text]) => waitForFont(spec, text))
+    ];
+
+    const total = tasks.length;
+    let done = 0;
+    const startedAt = Date.now();
+    const fillEl = document.getElementById('loading-fill');
+    const textEl = document.getElementById('loading-text');
+
+    function updateProgress() {
+        const pct = Math.round((done / total) * 100);
+        fillEl.style.width = pct + '%';
+        textEl.textContent = `${pct}%  (${done}/${total})`;
+    }
+    updateProgress();
+
+    const withTimeout = p => Promise.race([
+        p,
+        new Promise(resolve => setTimeout(() => resolve('timeout'), LOAD_TIMEOUT_MS))
+    ]);
+
+    Promise.all(tasks.map(t =>
+        withTimeout(t)
+            .catch(() => {})
+            .then(r => { if (r === 'timeout') console.warn('일부 파일이 오래 걸려 먼저 시작합니다.'); done++; updateProgress(); })
+    )).then(() => {
+        const wait = Math.max(0, MIN_LOADING_MS - (Date.now() - startedAt));
+        setTimeout(() => {
+            document.getElementById('loading-screen').classList.add('hidden');
+            document.getElementById('start-modal').classList.remove('hidden');
+        }, wait);
+    });
 }
 
 // 초기 화면 구성
@@ -2401,6 +2499,7 @@ fitGame();
 buildCharacterGrid();
 refreshCoinLabels();
 document.getElementById('stats-toggle').classList.toggle('off', !showStats);
+startPreload();
 </script>
 </body>
 </html>
