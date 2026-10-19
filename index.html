@@ -449,6 +449,8 @@ const BG_FILES = [
     'images/backg_3.png',
     'images/backg_4.png',
     'images/backg_5.png'
+    'images/backg_6.png'
+    'images/backg_7.png'
 ];
 const bgImages = BG_FILES.map(src => { const img = new Image(); img.src = src; return img; });
 
@@ -459,7 +461,7 @@ const BG_TILE_SIZE = 1254;
 // false: 같은 방향으로 그대로 반복 (이미지 자체가 이음새 없이 반복되도록 만들어졌을 때)
 const BG_MIRROR_TILES = true;
 // 배경을 어둡게 눌러 캐릭터/적이 더 잘 보이게 함 (0 = 원본 그대로, 0.3 = 30% 어둡게)
-const BG_DIM = 0.4;
+const BG_DIM = 0.3;
 // 배경이 바뀔 때 부드럽게 전환되는 시간(초)
 const BG_FADE_SECONDS = 1.5;
 
@@ -490,7 +492,7 @@ const BASE_ENEMY_SPEED = 3;
 // 치명타 기본 배율 (여기에 '치명타 피해' 스킬이 +10%씩 더해집니다)
 const CRIT_BASE_MULT = 2.0;
 
-// 경험치 조각 이미지 3종
+// 경험치 조각 이미지 4종
 const expGemImg1 = new Image();
 expGemImg1.src = 'images/exp_1.png';
 
@@ -499,6 +501,9 @@ expGemImg2.src = 'images/exp_2.png';
 
 const expGemImg3 = new Image();
 expGemImg3.src = 'images/exp_3.png';
+
+const expGemImg4 = new Image();
+expGemImg4.src = 'images/exp_4.png';
 
 // 적 PNG 설정: 파일은 HTML 파일과 같은 위치의 images 폴더에 둡니다.
 // 파일명이 아직 정해지지 않은 항목은 null로 두어 기존 원형 표시를 사용합니다.
@@ -511,11 +516,16 @@ const ENEMY_IMAGE_FILES = {
     Green: "monster4.png",
     Blue: "monster5.png",
     Indigo: "monster6.png",
-    Violet: "monster7.png",
+    Ice cream: "monster7.png",
+    Pudding: "monster8.png",
+    Bingsu: "monster9.png",
+    Choco: "monster10.png",
+    Violet: "monster78.png",
     Boss10: "boss10.png",
     Boss20: "boss20.png",
     Boss30: "boss30.png",
     Boss40: "boss40.png",
+    Boss60: "boss60.png",
 };
 
 const ENEMY_IMAGES = {};
@@ -575,10 +585,13 @@ const RAINBOW_TIERS = [
     { name: 'Red', color: '#ff3344', hp: 20, speedMult: 0.65, radius: 10, exp: 2 },
     { name: 'Orange', color: '#ff8800', hp: 55, speedMult: 0.70, radius: 11, exp: 5 },
     { name: 'Yellow', color: '#ffe600', hp: 110, speedMult: 0.60, radius: 12, exp: 10 },
-    { name: 'Green', color: '#2ecc71', hp: 200, speedMult: 0.75, radius: 12, exp: 18 },
+    { name: 'Green', color: '#2ecc71', hp: 200, speedMult: 0.73, radius: 12, exp: 18 },
     { name: 'Blue', color: '#3498db', hp: 340, speedMult: 0.68, radius: 13, exp: 30, isSplitter: true },
     { name: 'Indigo', color: '#8e44ad', hp: 550, speedMult: 0.72, radius: 14, exp: 60 },
-    { name: 'Violet', color: '#e056fd', hp: 900, speedMult: 0.80, radius: 15, exp: 100 }
+  { name: 'Ice cream', color: '#8e44ad', hp: 800, speedMult: 0.75, radius: 14, exp: 80 }, { name: 'Pudding', color: '#8e44ad', hp: 800, speedMult: 0.73, radius: 14, exp: 120 },
+{ name: 'Bingsu', color: '#8e44ad', hp: 1200, speedMult: 0.70, radius: 15, exp: 150 },
+{ name: 'Choco', color: '#8e44ad', hp: 1700, speedMult: 0.75, radius: 15, exp: 200 },
+    { name: 'Violet', color: '#e056fd', hp: 2700, speedMult: 0.80, radius: 16, exp: 300 }
 ];
 
 // 스킬 최대 레벨 (여기에 없는 스킬은 제한 없음)
@@ -908,7 +921,9 @@ function spawnEnemies(dt) {
         else if (lv >= 11 && lv <= 20) maxTierIdx = 2;
         else if (lv >= 21 && lv <= 30) maxTierIdx = 4;
         else if (lv >= 31 && lv <= 40) maxTierIdx = 5;
-        else maxTierIdx = 6;
+        else if (lv >= 41 && lv <= 40) maxTierIdx = 7;
+        else if (lv >= 51 && lv <= 60) maxTierIdx = 8;
+        else maxTierIdx = 9;
 
         let minTierIdx = Math.max(0, maxTierIdx - 1);
         let tierIdx = Math.floor(minTierIdx + Math.random() * (maxTierIdx - minTierIdx + 1));
@@ -929,7 +944,7 @@ function spawnEnemies(dt) {
 
 function checkBossMilestone() {
     let targetMilestone = Math.floor(player.level / 10) * 10;
-    if (targetMilestone >= 10 && targetMilestone <= 40 && bossSpawnedForLevel < targetMilestone) {
+    if (targetMilestone >= 10 && targetMilestone <= 60 && bossSpawnedForLevel < targetMilestone) {
         if (!enemies.some(e => e.isBoss)) {
             bossSpawnedForLevel = targetMilestone;
             spawnBoss(targetMilestone);
@@ -942,7 +957,8 @@ function spawnBoss(levelTier) {
         10: "악령이 된 기사",
         20: "타락한 마법사",
         30: "죽지 않는 초대왕",
-        40: "전직 수호자"
+        40: "불타버린 영혼",
+        60: "전직 수호자"
     };
     showAnnouncement(`⚠️ [Lv.${levelTier}] ${bossNames[levelTier]} 등장! ⚠️`);
 
@@ -1561,7 +1577,7 @@ function updateEnemies(dt) {
             if (e.isBoss) {
                 bossKills++;
                 handleBossRewards(e.bossLevel);
-                if (e.bossLevel === 40 && !clearSnapshot) recordClear();
+                if (e.bossLevel === 60 && !clearSnapshot) recordClear();
             } else if (e.tier.exp > 0) {
                 expGems.push({ x: e.x, y: e.y, val: e.tier.exp });
             }
@@ -1586,6 +1602,10 @@ function handleBossRewards(level) {
         showAnnouncement("🎉 보스 처치! HP 25 회복 & 무료 스킬 선택!");
         triggerLevelUp();
     } else if (level === 40) {
+        player.hp = Math.min(player.maxHp, player.hp + 30);
+        showAnnouncement("🎉 보스 처치! HP 30 회복 & 무료 스킬 선택!");
+        triggerLevelUp();
+    } else if (level === 60) {
         player.hp = Math.min(player.maxHp, player.hp + 30);
         player.level++;
         showAnnouncement("🎉 덕분에 우리 세계에 평화가 찾아왔어요! (우측 하단 버튼으로 종료)", 4000);
@@ -1713,8 +1733,11 @@ function render() {
         img = expGemImg1;
     } else if (g.val <= 60) {
         img = expGemImg2;
-    } else {
+    } else if (g.val <= 120 {
         img = expGemImg3;
+    } else {
+        img = expGemImg4;
+
     }
 
     // PNG 이미지 표시
