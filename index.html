@@ -566,10 +566,28 @@ Object.entries(ENEMY_IMAGE_FILES).forEach(([key, filename]) => {
 // =====================================================================
 //  효과음 (파일 없이 브라우저가 직접 만들어내는 소리)
 // =====================================================================
+// ===== 효과음 볼륨 설정 (소리 크기는 여기 숫자만 바꾸면 됩니다) =====
+const SFX_VOLUME = {
+    master: 0.5,    // 전체 음량 (0 ~ 1). 모든 소리에 한꺼번에 적용
+    hit: 1.0,       // 적을 공격할 때 나는 소리 (sfx_01.mp3)
+    exp: 1.0,       // 경험치 조각을 먹을 때
+    item: 1.0,      // 필드 아이템을 먹을 때
+    select: 1.0,    // 스킬 선택 버튼
+    boss: 1.0       // 보스 등장
+    // 소리별 값은 '배율'입니다. 1 = 기본, 0.5 = 절반, 0 = 끔, 2 = 2배
+};
+
+// 소리 파일 위치. 앞에서부터 차례로 찾아보고, 모두 없으면 기본 효과음(합성음)을 씁니다.
+const SFX_FILES = {
+    hit: ['sounds/sfx_01.mp3', 'images/sfx_01.mp3', 'sfx_01.mp3']
+};
+
 const SFX = (() => {
-    const MASTER_VOLUME = 0.5;      // 전체 음량 (0 ~ 1)
     let ac = null, master = null, muted = false;
+    const gains = {};       // 소리 종류별 볼륨 조절 노드
+    const buffers = {};     // 불러온 소리 파일
     const lastPlayed = {};
+    let out = null;         // 지금 재생 중인 소리가 연결될 출력 노드
     try { muted = localStorage.getItem('pixelSurvivors_muted') === '1'; } catch (e) {}
 
     function ctxReady() {
@@ -578,11 +596,42 @@ const SFX = (() => {
             if (!AC) return null;
             ac = new AC();
             master = ac.createGain();
-            master.gain.value = MASTER_VOLUME;
             master.connect(ac.destination);
+            Object.keys(SOUNDS).forEach(name => {
+                const g = ac.createGain();
+                g.connect(master);
+                gains[name] = g;
+            });
+            loadFiles();
         }
         if (ac.state === 'suspended') ac.resume();
         return ac;
+    }
+
+    // 소리 파일(mp3 등)을 미리 불러와 둠
+    function loadFiles() {
+        Object.entries(SFX_FILES).forEach(([name, paths]) => {
+            const tryNext = i => {
+                if (i >= paths.length) {
+                    console.warn('효과음 파일을 찾을 수 없어 기본 소리를 사용합니다:', paths.join(', '));
+                    return;
+                }
+                fetch(paths[i])
+                    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
+                    .then(data => new Promise((resolve, reject) => ac.decodeAudioData(data, resolve, reject)))
+                    .then(buf => { buffers[name] = buf; })
+                    .catch(() => tryNext(i + 1));
+            };
+            tryNext(0);
+        });
+    }
+
+    function playBuffer(name, rate = 1) {
+        const s = ac.createBufferSource();
+        s.buffer = buffers[name];
+        s.playbackRate.value = rate;
+        s.connect(out || master);
+        s.start();
     }
 
     // 음 하나: 시작 높이(f0) → 끝 높이(f1) 로 변하는 소리
@@ -595,11 +644,10 @@ const SFX = (() => {
         g.gain.setValueAtTime(0.0001, t);
         g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
         g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-        o.connect(g); g.connect(master);
+        o.connect(g); g.connect(out || master);
         o.start(t); o.stop(t + dur + 0.02);
     }
 
-    // 치지직 하는 잡음 (타격감, 폭발감)
     function noise(dur, vol, delay = 0, lowpass = 3000) {
         const t = ac.currentTime + delay;
         const len = Math.max(1, Math.floor(ac.sampleRate * dur));
@@ -609,14 +657,18 @@ const SFX = (() => {
         const s = ac.createBufferSource(); s.buffer = buf;
         const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = lowpass;
         const g = ac.createGain(); g.gain.value = vol;
-        s.connect(f); f.connect(g); g.connect(master);
+        s.connect(f); f.connect(g); g.connect(out || master);
         s.start(t);
     }
 
     // gap: 같은 소리가 이 시간(ms) 안에 또 나오지 않게 막음 (소리가 한꺼번에 겹쳐 시끄러워지는 것 방지)
     const SOUNDS = {
         exp:    { gap: 45, play: () => tone('sine', 900 + Math.random() * 200, 1500, 0.08, 0.16) },
-        hit:    { gap: 55, play: () => { tone('triangle', 260 + Math.random() * 60, 120, 0.07, 0.2); noise(0.05, 0.12, 0, 4000); } },
+        // 적을 공격할 때: sfx_01.mp3 (재생할 때마다 음높이를 살짝 바꿔서 단조롭지 않게 함). 파일이 없으면 기본 합성음
+        hit:    { gap: 55, play: () => {
+                    if (buffers.hit) playBuffer('hit', 0.94 + Math.random() * 0.12);
+                    else { tone('triangle', 260 + Math.random() * 60, 120, 0.07, 0.2); noise(0.05, 0.12, 0, 4000); }
+                } },
         item:   { gap: 80, play: () => { tone('sine', 523, 523, 0.10, 0.22); tone('sine', 659, 659, 0.10, 0.22, 0.08); tone('sine', 880, 880, 0.16, 0.22, 0.16); } },
         select: { gap: 60, play: () => { tone('square', 440, 440, 0.08, 0.12); tone('square', 660, 660, 0.12, 0.12, 0.07); } },
         boss:   { gap: 500, play: () => { tone('sawtooth', 110, 55, 0.9, 0.3); tone('square', 82, 41, 1.0, 0.18, 0.05); noise(0.7, 0.2, 0, 800); tone('sawtooth', 220, 110, 0.5, 0.15, 0.35); } }
@@ -630,7 +682,13 @@ const SFX = (() => {
         if (lastPlayed[name] && now - lastPlayed[name] < s.gap) return;
         if (!ctxReady()) return;
         lastPlayed[name] = now;
+        // 볼륨은 재생할 때마다 SFX_VOLUME 에서 읽어옴 (게임 중 콘솔에서 바꿔도 바로 반영)
+        master.gain.value = SFX_VOLUME.master;
+        const g = gains[name];
+        if (g) g.gain.value = (SFX_VOLUME[name] === undefined ? 1 : SFX_VOLUME[name]);
+        out = g || null;
         try { s.play(); } catch (e) {}
+        out = null;
     }
 
     function refreshButton() {
@@ -667,7 +725,7 @@ let player = {
     x: 0, y: 0, radius: 12, hp: 100, maxHp: 100, speed: 3.2,
     level: 1, exp: 0, maxExp: 8, invincibleTimer: 0, facingAngle: 0, magnetRange: 100,
     attackPower: 25, attackSpeedRatio: 1.0, bulletCount: 1, pierceCount: 1,
-    hasSplash: false, splashRadiusMult: 1, critChance: 0, critDamage: 0, flatpowerLevel: 0, expMult: 1, damageTakenMult: 1, revivesLeft: 0, cardChoices: 3,
+    hasSplash: false, splashRadiusMult: 1, critChance: 0, critDamage: 0, flatpowerLevel: 0, helperLevel: 0, helperTimer: 0, expMult: 1, damageTakenMult: 1, revivesLeft: 0, cardChoices: 3,
     laserLevel: 0, laserCooldown: 0,
     chainLevel: 0, bombLevel: 0, bombTimer: 0,
     tornadoLevel: 0, tornadoAngle: 0
@@ -732,7 +790,18 @@ const BOSS_LEVELS = [10, 20, 30, 40, 60];
 const BOSS_APPEAR_STAGE = { 10: 1, 20: 2, 30: 3, 40: 4 };
 
 // 스킬 최대 레벨 (여기에 없는 스킬은 제한 없음)
-const SKILL_MAX_LEVEL = { laser: 13, bomb: 13, chain: 13, flatpower: 5 };
+const SKILL_MAX_LEVEL = { laser: 13, bomb: 13, chain: 13, flatpower: 5, helper: 5 };
+
+// ===== '도와줘!' 스킬 설정 (아군 천사) =====
+const HELPER_BASE_INTERVAL = 15;    // Lv.1 등장 주기(초): 이 시간마다 한 번 나타남
+const HELPER_BASE_DURATION = 3;     // Lv.1 활동 시간(초): 나타나서 이만큼 공격하고 사라짐
+const HELPER_INTERVAL_STEP = 1;     // 레벨이 오를 때마다 등장 주기가 줄어드는 시간(초)
+const HELPER_DURATION_STEP = 1;     // 레벨이 오를 때마다 활동 시간이 늘어나는 시간(초)
+const HELPER_FIRST_DELAY = 3;       // 스킬을 처음 얻은 뒤 첫 등장까지 걸리는 시간(초)
+const HELPER_SPRITE_BOX = 72;       // 천사 이미지 크기(px, 원본 비율 유지)
+const helpAngelImg = new Image();
+helpAngelImg.src = 'images/help_angel.png';
+let helper = null;                  // 지금 나와 있는 천사 (없으면 null)
 
 // 레벨업 선택창에 띄울 수 있는 스킬인지 확인
 function isSkillAvailable(skill) {
@@ -755,7 +824,8 @@ const SKILLS = [
     { id: 'movespeed', title: '이동 속도', icon: '👟', desc: '플레이어의 이동 속도가 5% 증가합니다.' },
     { id: 'crit', title: '치명타 확률', icon: '🎯', desc: '모든 공격의 치명타 확률이 +5% 증가합니다. (최대 100%)' },
     { id: 'critdmg', title: '치명타 피해', icon: '💢', desc: '치명타 피해가 +10% 증가합니다. (치명타 기본 2배)' },
-    { id: 'flatpower', title: '공격력 +10', icon: '💪', desc: '공격력이 +10 증가합니다. (한 판에 최대 5번)' }
+    { id: 'helper', title: '도와줘!', icon: '👼', desc: '아군 천사가 나타나 내 공격 능력 그대로 적을 공격하고 사라집니다. (15초마다 3초간 / 레벨당 주기 -1초, 활동 +1초 / 최대 Lv.5)' },
+    { id: 'flatpower', title: '공격력 +5', icon: '💪', desc: '공격력이 +5 증가합니다. (한 판에 최대 5번)' }
 ];
 
 window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
@@ -802,15 +872,15 @@ const CHARACTERS = {
     p1: {
         name: '공듀', icon: '👸🏼', image: 'images/player1.png', bulletImage: 'images/attack_1.png',
         attackMult: 1.10, attackSpeed: 0.85, moveMult: 1.0, pierce: 1,
-        splash: true, splashRadius: 1.1, crit: 0, startSkills: { bomb: 1 }, cardChoices: 3,
-        ability: '💥 공격력 +10% / 광역 공격 / 시작 스킬 💣 폭탄', drawback: '공격 속도 15% 감소',
+        splash: true, splashRadius: 1.1, crit: 0, startSkills: { bomb: 2 }, cardChoices: 3,
+        ability: '💥 공격력 +10% / 광역 공격 / 시작 스킬 💣 폭탄 Lv.2', drawback: '공격 속도 15% 감소',
         announce: '빨리 처리하고 밥 먹자'
     },
     p2: {
         name: '완댜', icon: '🫅🏼', image: 'images/player2.png', bulletImage: 'images/attack_2.png',
         attackMult: 0.88, attackSpeed: 1.20, moveMult: 1.0, pierce: 2,
-        splash: false, splashRadius: 1.0, crit: 0.10, startSkills: {}, cardChoices: 3,
-        ability: '🏹 공격 속도 +20% / 관통 +1 / 치명타 10% (2배)', drawback: '공격력 12% 감소',
+        splash: false, splashRadius: 1.0, crit: 0.05, startSkills: {}, cardChoices: 3,
+        ability: '🏹 공격 속도 +20% / 관통 +1 / 치명타 5% (2배)', drawback: '공격력 12% 감소',
         announce: '이 몸이 해결하겠다'
     },
     p3: {
@@ -823,8 +893,8 @@ const CHARACTERS = {
     p4: {
         name: '애옹', icon: '🐈', image: 'images/player4.png', bulletImage: 'images/attack_4.png',
         attackMult: 1.15, attackSpeed: 1.0, moveMult: 1.20, pierce: 1,
-        splash: false, splashRadius: 1.0, crit: 0, startSkills: {}, cardChoices: 4,
-        ability: '🐟 공격력 +15% / 이동 +20% / 🍀 레벨업 카드 4장 중 선택', drawback: '시작 스킬 없음 (초반이 약함)',
+        splash: false, splashRadius: 1.0, crit: 0, startSkills: {}, extraBullets: 1, cardChoices: 4,
+        ability: '🐟 공격력 +15% / 이동 +20% / 🏹 시작 투사체 +1 / 🍀 레벨업 카드 4장 중 선택', drawback: '시작 스킬 없음',
         announce: '잡아줄테니 걱정말라냥'
     }
 };
@@ -855,6 +925,7 @@ function applyCharacterStats(charType) {
     player.attackSpeedRatio = c.attackSpeed;
     player.speed = BASE_PLAYER_SPEED * c.moveMult;
     player.pierceCount = c.pierce;
+    player.bulletCount = 1 + (c.extraBullets || 0);   // 시작 투사체 (애옹은 +1)
     player.hasSplash = c.splash;
     player.splashRadiusMult = c.splashRadius;
     player.critChance = c.crit;
@@ -904,6 +975,7 @@ function resetGame() {
     gameTime = 0;
     killCount = 0;
     bossKills = 0;
+    helper = null;
     clearSnapshot = null;
     bgStage = 0; bgPrevStage = 0; bgFade = 1;
     boss40Killed = false;
@@ -925,7 +997,7 @@ function resetGame() {
         x: 0, y: 0, radius: 12, hp: 100, maxHp: 100, speed: 3.2,
         level: 1, exp: 0, maxExp: 8, invincibleTimer: 0, facingAngle: 0, magnetRange: 100,
         attackPower: 25, attackSpeedRatio: 1.0, bulletCount: 1, pierceCount: 1,
-        hasSplash: false, splashRadiusMult: 1, critChance: 0, critDamage: 0, flatpowerLevel: 0, expMult: 1, damageTakenMult: 1, revivesLeft: 0, cardChoices: 3,
+        hasSplash: false, splashRadiusMult: 1, critChance: 0, critDamage: 0, flatpowerLevel: 0, helperLevel: 0, helperTimer: 0, expMult: 1, damageTakenMult: 1, revivesLeft: 0, cardChoices: 3,
         laserLevel: 0, laserCooldown: 0,
         chainLevel: 0, bombLevel: 0, bombTimer: 0,
         tornadoLevel: 0, tornadoAngle: 0
@@ -1006,6 +1078,8 @@ function update(dt) {
         updateTornadoHits(dt);
     }
 
+    updateHelper(dt);
+
     itemSpawnTimer += dt;
     if (itemSpawnTimer >= 30.0) {
         itemSpawnTimer = 0;
@@ -1052,7 +1126,10 @@ function spawnRandomMapItem() {
 }
 
 function spawnEnemies(dt) {
-    let spawnRate = Math.min(8, 1.8 + killCount / 25);
+    // [초반 완화 1] 동시에 살아있는 적의 최대 수: 시간이 지날수록 서서히 늘어남 (초반에 화면이 꽉 차는 것 방지)
+    if (enemies.length >= 50 + gameTime * 0.8) return;
+    // [초반 완화 2] 처음엔 적이 천천히 나오고, 300초에 걸쳐 원래 속도로 올라옴
+    let spawnRate = Math.min(8, 1.8 + killCount / 25) * Math.min(1, 0.5 + gameTime / 300);
     if (Math.random() < spawnRate * dt) {
         let names;
         if (bgStage === 0) {
@@ -1064,7 +1141,7 @@ function spawnEnemies(dt) {
         let tier = RAINBOW_TIERS.find(t => t.name === pick);
 
         let angle = Math.random() * Math.PI * 2;
-        let scaledHp = tier.hp + (gameTime * 1.5);
+        let scaledHp = tier.hp + Math.max(0, gameTime - 40) * 1.5;   // [초반 완화 3] 처음 40초는 체력이 늘어나지 않음
 
         enemies.push({
             x: player.x + Math.cos(angle) * 520,
@@ -1091,6 +1168,85 @@ function checkLateStage() {
     if (boss40Killed && player.level >= 50 && bgStage < 5) setBackgroundStage(5);
 }
 
+// 플레이어 기본 공격의 초당 화력 (보스 체력 계산용)
+// '도와줘!' 레벨별 등장 주기 / 활동 시간
+function helperInterval(lv) { return Math.max(1, HELPER_BASE_INTERVAL - (lv - 1) * HELPER_INTERVAL_STEP); }
+function helperDuration(lv) { return HELPER_BASE_DURATION + (lv - 1) * HELPER_DURATION_STEP; }
+
+// 아군 천사: 주기마다 나타나서, 플레이어와 똑같은 공격 능력(공격력/공격속도/투사체/관통/치명타)으로 쏘고 사라짐
+function updateHelper(dt) {
+    if (player.helperLevel <= 0) { helper = null; return; }
+    const lv = player.helperLevel;
+
+    player.helperTimer += dt;
+    if (player.helperTimer >= helperInterval(lv)) {
+        player.helperTimer = 0;
+        helper = { x: player.x - 60, y: player.y - 40, age: 0, timeLeft: helperDuration(lv), duration: helperDuration(lv), fireTimer: 0 };
+        createParticles(helper.x, helper.y, '#fff7a8', 14);
+    }
+
+    if (!helper) return;
+    helper.age += dt;
+    helper.timeLeft -= dt;
+
+    // 플레이어 옆을 둥실둥실 따라다님
+    const tx = player.x - 70 + Math.cos(helper.age * 1.3) * 18;
+    const ty = player.y - 50 + Math.sin(helper.age * 2.1) * 12;
+    const follow = Math.min(1, dt * 6);
+    helper.x += (tx - helper.x) * follow;
+    helper.y += (ty - helper.y) * follow;
+
+    helper.fireTimer += dt * player.attackSpeedRatio;
+    if (helper.fireTimer >= 1.0) {
+        helper.fireTimer = 0;
+        fireMainProjectiles(helper.x, helper.y);
+    }
+
+    if (helper.timeLeft <= 0) {
+        createParticles(helper.x, helper.y, '#fff7a8', 14);
+        helper = null;
+    }
+}
+
+function drawHelper() {
+    if (!helper) return;
+    const fadeIn = Math.min(1, helper.age / 0.3);
+    const fadeOut = Math.min(1, Math.max(0, helper.timeLeft) / 0.4);
+    ctx.save();
+    ctx.globalAlpha = Math.min(fadeIn, fadeOut);
+    if (helpAngelImg.complete && helpAngelImg.naturalWidth > 0) {
+        const ratio = helpAngelImg.naturalWidth / helpAngelImg.naturalHeight;
+        let w, h;
+        if (ratio >= 1) { w = HELPER_SPRITE_BOX; h = HELPER_SPRITE_BOX / ratio; }
+        else            { h = HELPER_SPRITE_BOX; w = HELPER_SPRITE_BOX * ratio; }
+        ctx.imageSmoothingEnabled = SPRITE_SMOOTHING;
+        if (SPRITE_SMOOTHING) ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(helpAngelImg, helper.x - w / 2, helper.y - h / 2, w, h);
+    } else {
+        ctx.font = '36px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('👼', helper.x, helper.y + 12);
+    }
+    ctx.restore();
+}
+
+function playerMainDps() {
+    return player.attackPower * player.attackSpeedRatio * player.bulletCount * (1 + player.critChance * (critMultiplier() - 1));
+}
+
+// ===== 보스 능력표 =====
+// minHp: 최소 체력 / seconds: 체력 = 이 시간(초) × 플레이어 기본공격 초당 화력 (플레이어가 강할수록 보스도 단단해짐)
+// speed: 이동속도(플레이어 기본속도 대비 배율) / contact: 몸통 박치기 피해
+// bullets: 한 번에 쏘는 탄 개수(0이면 안 쏨) / interval: 발사 간격(초) / bulletDmg: 탄 1발 피해 / bulletSpeed: 탄 속도
+// 체력이 절반 이하로 떨어지면 발사 간격이 1.4배 빨라짐 (분노)
+const BOSS_STATS = {
+    10: { minHp: 4000, seconds: 40, speed: 0.75, contact: 25, bullets: 0, interval: 0, bulletDmg: 0, bulletSpeed: 0 },
+    20: { minHp: 8000, seconds: 45, speed: 0.6, contact: 30, bullets: 10, interval: 2.4, bulletDmg: 14, bulletSpeed: 4.0 },
+    30: { minHp: 13000, seconds: 55, speed: 0.62, contact: 35, bullets: 14, interval: 2.0, bulletDmg: 16, bulletSpeed: 4.2 },
+    40: { minHp: 20000, seconds: 60, speed: 0.65, contact: 40, bullets: 18, interval: 1.7, bulletDmg: 18, bulletSpeed: 4.4 },
+    60: { minHp: 40000, seconds: 90, speed: 0.7, contact: 50, bullets: 24, interval: 1.4, bulletDmg: 22, bulletSpeed: 4.8 }
+};
+
 function spawnBoss(levelTier) {
     let bossNames = {
         10: "악령이 된 기사",
@@ -1104,13 +1260,15 @@ function spawnBoss(levelTier) {
     if (BOSS_APPEAR_STAGE[levelTier] !== undefined) setBackgroundStage(BOSS_APPEAR_STAGE[levelTier]);   // 보스 등장 → 배경 변경
 
     let angle = Math.random() * Math.PI * 2;
-    let bossHp = 800 + levelTier * 500;
+    const bs = BOSS_STATS[levelTier];
+    let bossHp = Math.max(bs.minHp, Math.round(bs.seconds * playerMainDps()));
     enemies.push({
         x: player.x + Math.cos(angle) * 480,
         y: player.y + Math.sin(angle) * 480,
         tier: { name: `Boss${levelTier}`, color: '#ffffff', radius: 28 },
         hp: bossHp, maxHp: bossHp,
-        speed: BASE_PLAYER_SPEED * 0.58,
+        speed: BASE_PLAYER_SPEED * bs.speed,
+        stats: bs,
         isBoss: true,
         bossLevel: levelTier,
         shootTimer: 0
@@ -1147,8 +1305,12 @@ function hurtPlayer(base) {
     createDamageText(player.x, player.y, dmg, '#ff3366');
 }
 
-function fireMainProjectiles() {
-    let targets = getNearestEnemies(player.bulletCount);
+// ox, oy: 발사 위치 (기본은 플레이어. 아군 천사가 쏠 때는 천사 위치를 넘김)
+function fireMainProjectiles(ox = player.x, oy = player.y) {
+    let targets = getNearestEnemies(player.bulletCount, ox, oy);
+    // 보스 집중 조준: 보스가 가까이(700px 이내) 있으면 모든 탄환이 보스를 향함 (보스전이 '화력 대결'이 되도록)
+    const bossTarget = enemies.find(e => e.isBoss && Math.hypot(e.x - ox, e.y - oy) < 700);
+    if (bossTarget) targets = Array(player.bulletCount).fill(bossTarget);
 
     if (targets.length === 0) {
         for (let i = 0; i < player.bulletCount; i++) {
@@ -1157,8 +1319,8 @@ function fireMainProjectiles() {
                 (i - (player.bulletCount - 1) / 2) * 0.2;
 
             projectiles.push({
-                x: player.x,
-                y: player.y,
+                x: ox,
+                y: oy,
                 vx: Math.cos(angle) * 8.5,
                 vy: Math.sin(angle) * 8.5,
                 pierce: player.pierceCount,
@@ -1169,13 +1331,13 @@ function fireMainProjectiles() {
     } else {
         targets.forEach(t => {
             let angle = Math.atan2(
-                t.y - player.y,
-                t.x - player.x
+                t.y - oy,
+                t.x - ox
             );
 
             projectiles.push({
-                x: player.x,
-                y: player.y,
+                x: ox,
+                y: oy,
                 vx: Math.cos(angle) * 8.5,
                 vy: Math.sin(angle) * 8.5,
                 pierce: player.pierceCount,
@@ -1671,18 +1833,21 @@ function updateEnemies(dt) {
         e.x += Math.cos(angle) * e.speed;
         e.y += Math.sin(angle) * e.speed;
 
-        if (e.isBoss && e.bossLevel >= 20 && dist < 450) {
+        if (e.isBoss && e.stats.bullets > 0 && dist < 450) {
             e.shootTimer += dt;
-            let interval = e.bossLevel >= 30 ? 1.8 : 2.5;
+            const enraged = e.hp < e.maxHp * 0.5;                       // 체력 절반 이하 → 분노
+            const interval = e.stats.interval / (enraged ? 1.4 : 1);
             if (e.shootTimer >= interval) {
                 e.shootTimer = 0;
-                let count = e.bossLevel >= 40 ? 12 : 8;
+                const count = e.stats.bullets;
+                const offset = Math.random() * Math.PI * 2;             // 매번 다른 각도에서 발사
                 for (let b = 0; b < count; b++) {
-                    let bAngle = ((Math.PI * 2) / count) * b;
+                    let bAngle = ((Math.PI * 2) / count) * b + offset;
                     enemyProjectiles.push({
                         x: e.x, y: e.y,
-                        vx: Math.cos(bAngle) * 4.0, vy: Math.sin(bAngle) * 4.0,
-                        radius: 5
+                        vx: Math.cos(bAngle) * e.stats.bulletSpeed, vy: Math.sin(bAngle) * e.stats.bulletSpeed,
+                        radius: 5,
+                        dmg: e.stats.bulletDmg
                     });
                 }
             }
@@ -1690,7 +1855,7 @@ function updateEnemies(dt) {
 
         if (dist < player.radius + radius) {
             if (player.invincibleTimer <= 0) {
-                hurtPlayer(e.isBoss ? 25 : 12);
+                hurtPlayer(e.isBoss ? e.stats.contact : 12);
             }
         }
 
@@ -1763,7 +1928,7 @@ function updateEnemyProjectiles(dt) {
 
         if (Math.hypot(player.x - ep.x, player.y - ep.y) < player.radius + ep.radius) {
             if (player.invincibleTimer <= 0) {
-                hurtPlayer(12);
+                hurtPlayer(ep.dmg || 12);
             }
             enemyProjectiles.splice(i, 1);
             continue;
@@ -1820,13 +1985,23 @@ function addExp(val) {
     }
 }
 
+// 공정한 섞기 (Fisher-Yates). 예전 sort(() => 0.5 - Math.random()) 방식은 카드마다 나올 확률이 달라지는 문제가 있었음
+function shuffleArray(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+}
+
 function triggerLevelUp() {
     gameState = 'LEVELUP';
     let wrapper = document.getElementById('cards-wrapper');
     wrapper.innerHTML = '';
 
     // 최대 레벨에 도달한 스킬은 선택지에서 제외
-    let shuffled = SKILLS.filter(isSkillAvailable).sort(() => 0.5 - Math.random()).slice(0, player.cardChoices);
+    let shuffled = shuffleArray(SKILLS.filter(isSkillAvailable)).slice(0, player.cardChoices);
     shuffled.forEach(skill => {
         let card = document.createElement('div');
         card.className = 'card';
@@ -1856,7 +2031,11 @@ function selectSkill(id) {
     if (id === 'movespeed') player.speed *= 1.05;
     if (id === 'crit') player.critChance = Math.min(1, player.critChance + 0.05);
     if (id === 'critdmg') player.critDamage += 10;
-    if (id === 'flatpower') { player.flatpowerLevel++; player.attackPower += 10; }
+    if (id === 'helper') {
+        if (player.helperLevel === 0) player.helperTimer = helperInterval(1) - HELPER_FIRST_DELAY;   // 처음 얻으면 곧바로 첫 등장
+        player.helperLevel = Math.min(5, player.helperLevel + 1);
+    }
+    if (id === 'flatpower') { player.flatpowerLevel++; player.attackPower += 5; }
 
     document.getElementById('levelup-modal').classList.add('hidden');
     player.invincibleTimer = 2.0;
@@ -2071,6 +2250,7 @@ function render() {
     }
     ctx.restore();
 
+    drawHelper();          // 👼 아군 천사
     renderVisualEffects(); // 💥 폭발 애니메이션 및 연쇄전격 렌더링
     renderParticles();
     renderFloatingTexts();
@@ -2241,6 +2421,7 @@ function renderStatsPanel() {
     if (player.bombLevel > 0)    skillLines.push(`💣 폭탄 Lv.${player.bombLevel}${maxTag(player.bombLevel, 13)}`);
     if (player.chainLevel > 0)   skillLines.push(`🌩️ 연쇄 전격 Lv.${player.chainLevel}${maxTag(player.chainLevel, 13)}`);
     if (player.tornadoLevel > 0) skillLines.push(`🌪️ 회오리 Lv.${player.tornadoLevel}`);
+    if (player.helperLevel > 0)  skillLines.push(`👼 도와줘! Lv.${player.helperLevel}${maxTag(player.helperLevel, 5)}`);
     if (skillLines.length) { lines.push('— 스킬 —'); lines.push(...skillLines); }
 
     ctx.save();
@@ -2253,9 +2434,9 @@ function renderStatsPanel() {
     ctx.restore();
 }
 
-function getNearestEnemies(count) {
+function getNearestEnemies(count, x = player.x, y = player.y) {
     return [...enemies]
-        .sort((a, b) => Math.hypot(player.x - a.x, player.y - a.y) - Math.hypot(player.x - b.x, player.y - b.y))
+        .sort((a, b) => Math.hypot(x - a.x, y - a.y) - Math.hypot(x - b.x, y - b.y))
         .slice(0, count);
 }
 
@@ -2319,6 +2500,9 @@ function distToSegment(p, v, w) {
 const SAVE_KEY = 'pixelSurvivors_save_v1';
 
 // id, 표시 이름, 설명, 최대 레벨, 첫 구매가, 가격 증가율
+// 상점 치명타 확률: 레벨별 '누적' 증가량(%). 인덱스 = 구매한 레벨 (0레벨 ~ 15레벨)
+const CRIT_SHOP_TOTAL = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 34, 38, 42, 46, 50];
+
 const UPGRADES = [
     { id: 'hp',       icon: '❤️', name: '체력 단련',   desc: '최대 HP +8',          max: 10, base: 30, grow: 1.30 },
     { id: 'power',    icon: '🔥', name: '공격력 훈련', desc: '공격력 +4%',          max: 10, base: 40, grow: 1.32 },
@@ -2328,7 +2512,7 @@ const UPGRADES = [
     { id: 'exp',      icon: '📘', name: '경험치 획득', desc: '경험치 +5%',          max: 10, base: 50, grow: 1.30 },
     { id: 'armor',    icon: '🛡️', name: '단단한 몸',   desc: '받는 피해 -4%',       max: 6,  base: 60, grow: 1.40 },
     { id: 'coin',     icon: '🍀', name: '행운의 동전', desc: '획득 코인 +10%',       max: 5,  base: 80, grow: 1.45 },
-    { id: 'crit',     icon: '🎯', name: '치명타 확률', desc: '치명타 확률 +2%',      max: 5,  base: 70, grow: 1.45 },
+    { id: 'crit',     icon: '🎯', name: '치명타 확률', desc: '치명타 확률 최대 +50% (Lv.1~10: +3%씩 / Lv.11~15: +4%씩)', noSuffix: true, current: lv => `현재 +${CRIT_SHOP_TOTAL[lv]}%`, max: 15, base: 50, grow: 1.20 },
     { id: 'revive',   icon: '✨', name: '부활',        desc: '사망 시 HP 50%로 부활', max: 2,  costs: [400, 1200] }
 ];
 
@@ -2362,7 +2546,7 @@ function applyMetaUpgrades() {
     player.expMult = 1 + 0.05 * upLv('exp');
     player.damageTakenMult = 1 - 0.04 * upLv('armor');
     player.revivesLeft = upLv('revive');
-    player.critChance += 0.02 * upLv('crit');
+    player.critChance += CRIT_SHOP_TOTAL[Math.min(upLv('crit'), CRIT_SHOP_TOTAL.length - 1)] / 100;
 }
 
 // ----- 60레벨 보스 처치 시 기록 고정 + 게임 종료 버튼 -----
@@ -2465,8 +2649,8 @@ function renderShop() {
             <div class="s-icon">${u.icon}</div>
             <div class="s-body">
                 <div class="s-name">${u.name}</div>
-                <div class="s-desc">${u.desc} (레벨당)</div>
-                <div class="s-lv">Lv.${lv} / ${u.max}</div>
+                <div class="s-desc">${u.desc}${u.noSuffix ? '' : ' (레벨당)'}</div>
+                <div class="s-lv">Lv.${lv} / ${u.max}${u.current ? '  (' + u.current(lv) + ')' : ''}</div>
             </div>`;
         const btn = document.createElement('button');
         btn.textContent = maxed ? 'MAX' : `🪙 ${cost}`;
@@ -2644,7 +2828,7 @@ function startPreload() {
     });
 
     const images = [
-        laserBeamImg, laserHitImg, tornadoImg,
+        laserBeamImg, laserHitImg, tornadoImg, helpAngelImg,
         expGemImg1, expGemImg2, expGemImg3, expGemImg4,
         ...bgImages,
         ...Object.values(ENEMY_IMAGES).filter(Boolean),
