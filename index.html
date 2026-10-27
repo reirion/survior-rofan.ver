@@ -725,7 +725,7 @@ let player = {
     x: 0, y: 0, radius: 12, hp: 100, maxHp: 100, speed: 3.2,
     level: 1, exp: 0, maxExp: 8, invincibleTimer: 0, facingAngle: 0, magnetRange: 100,
     attackPower: 25, attackSpeedRatio: 1.0, bulletCount: 1, pierceCount: 1,
-    hasSplash: false, splashRadiusMult: 1, critChance: 0, critDamage: 0, flatpowerLevel: 0, helperLevel: 0, helperTimer: 0, expMult: 1, damageTakenMult: 1, revivesLeft: 0, cardChoices: 3,
+    hasSplash: false, splashRadiusMult: 1, critChance: 0, critDamage: 0, flatpowerLevel: 0, helperLevel: 0, helperTimer: 0, poisonLevel: 0, poisonTimer: 0, expMult: 1, damageTakenMult: 1, revivesLeft: 0, cardChoices: 3,
     laserLevel: 0, laserCooldown: 0,
     chainLevel: 0, bombLevel: 0, bombTimer: 0,
     tornadoLevel: 0, tornadoAngle: 0
@@ -790,7 +790,7 @@ const BOSS_LEVELS = [10, 20, 30, 40, 60];
 const BOSS_APPEAR_STAGE = { 10: 1, 20: 2, 30: 3, 40: 4 };
 
 // 스킬 최대 레벨 (여기에 없는 스킬은 제한 없음)
-const SKILL_MAX_LEVEL = { laser: 13, bomb: 13, chain: 13, flatpower: 5, helper: 5 };
+const SKILL_MAX_LEVEL = { laser: 13, bomb: 10, chain: 13, tornado: 10, flatpower: 5, helper: 5, poison: 7 };
 
 // ===== '도와줘!' 스킬 설정 (아군 천사) =====
 const HELPER_BASE_INTERVAL = 15;    // Lv.1 등장 주기(초): 이 시간마다 한 번 나타남
@@ -803,6 +803,22 @@ const helpAngelImg = new Image();
 helpAngelImg.src = 'images/help_angel.png';
 let helper = null;                  // 지금 나와 있는 천사 (없으면 null)
 
+// ===== '독' 스킬 설정 =====
+const POISON_MAX_LEVEL = 7;         // 스킬 최대 레벨
+const POISON_BASE_INTERVAL = 6;     // 독을 설치하는 주기(초)
+const POISON_FIRST_DELAY = 2;       // 스킬을 처음 얻은 뒤 첫 설치까지(초)
+const POISON_RADIUS = 60;           // 독 구름의 반지름(px, 충돌 범위)
+const POISON_TICK = 0.5;            // 지속 피해를 주는 간격(초)
+const poisonImg = new Image();
+poisonImg.src = 'images/poison_1.png';
+let poisons = [];                   // 지금 깔려 있는 독 구름들
+
+// 레벨별: 한 번에 설치하는 개수 / 지속 시간 / 틱당 피해(공격력 배율)
+function poisonCount(lv) { return 1 + Math.floor(lv / 2); }                 // 1,2,2,3,3,4,4
+function poisonDuration(lv) { return 4 + lv; }                              // 5 ~ 11초
+function poisonDmgPerTick() { return player.attackPower * (0.25 + 0.05 * player.poisonLevel); }   // 0.3 ~ 0.6 공격력 / 0.5초
+
+
 // 레벨업 선택창에 띄울 수 있는 스킬인지 확인
 function isSkillAvailable(skill) {
     const max = SKILL_MAX_LEVEL[skill.id];
@@ -813,9 +829,9 @@ function isSkillAvailable(skill) {
 
 const SKILLS = [
     { id: 'laser', title: '레이저', icon: '⚡', desc: '이동 방향으로 관통 레이저 발사. (최대 Lv.13 / 13레벨이 되면 360도)' },
-    { id: 'bomb', title: '폭탄', icon: '💣', desc: '3초마다 주변에 공격력의 70% 광역 데미지. (레벨당 범위 +10%, 최대 Lv.13)' },
+    { id: 'bomb', title: '폭탄', icon: '💣', desc: '3초마다 주변에 광역 데미지. (레벨당 범위 +10%, 피해 +15%, 최대 Lv.10 / Lv.10이 되면 적을 뒤로 밀쳐냅니다)' },
     { id: 'chain', title: '번개', icon: '🌩️', desc: '탄환 적중 시 주변 적 연쇄 번개. (레벨당 확률+5%, 데미지+3%, 연쇄+1, 최대 Lv.13)' },
-    { id: 'tornado', title: '회오리', icon: '🌪️', desc: '주변을 맴돌며 50% 지속 데미지. (레벨당 개수+1, 속도&데미지 +5%)' },
+    { id: 'tornado', title: '회오리', icon: '🌪️', desc: '주변을 맴돌며 지속 데미지. (레벨당 개수+1, 속도 +5%, 피해 +12%, 최대 Lv.10 / Lv.10이 되면 회전 반경이 넓어집니다)' },
     { id: 'magnet', title: '자석 강화', icon: '🧲', desc: '경험치 조각을 끌어당기는 자석 흡수 범위가 대폭 확장됩니다.' },
     { id: 'bullet', title: '투사체 증가', icon: '🏹', desc: '발사되는 탄환의 개수가 +1개 증가합니다.' },
     { id: 'pierce', title: '관통력 증가', icon: '🗡️', desc: '탄환이 적을 뚫고 지나가는 횟수가 +1회 증가합니다.' },
@@ -825,6 +841,7 @@ const SKILLS = [
     { id: 'crit', title: '치명타 확률', icon: '🎯', desc: '모든 공격의 치명타 확률이 +5% 증가합니다. (최대 100%)' },
     { id: 'critdmg', title: '치명타 피해', icon: '💢', desc: '치명타 피해가 +10% 증가합니다. (치명타 기본 2배)' },
     { id: 'helper', title: '도와줘!', icon: '👼', desc: '아군 천사가 나타나 내 공격 능력 그대로 적을 공격하고 사라집니다. (15초마다 3초간 / 레벨당 주기 -1초, 활동 +1초 / 최대 Lv.5)' },
+    { id: 'poison', title: '독', icon: '☠️', desc: '화면 안 랜덤한 곳에 독 구름을 설치합니다. 닿은 적이 지속 피해를 받습니다. (6초마다 설치 / 레벨마다 피해·지속시간·개수 증가 / 최대 Lv.7)' },
     { id: 'flatpower', title: '공격력 +5', icon: '💪', desc: '공격력이 +5 증가합니다. (한 판에 최대 5번)' }
 ];
 
@@ -976,6 +993,7 @@ function resetGame() {
     killCount = 0;
     bossKills = 0;
     helper = null;
+    poisons = [];
     clearSnapshot = null;
     bgStage = 0; bgPrevStage = 0; bgFade = 1;
     boss40Killed = false;
@@ -997,7 +1015,7 @@ function resetGame() {
         x: 0, y: 0, radius: 12, hp: 100, maxHp: 100, speed: 3.2,
         level: 1, exp: 0, maxExp: 8, invincibleTimer: 0, facingAngle: 0, magnetRange: 100,
         attackPower: 25, attackSpeedRatio: 1.0, bulletCount: 1, pierceCount: 1,
-        hasSplash: false, splashRadiusMult: 1, critChance: 0, critDamage: 0, flatpowerLevel: 0, helperLevel: 0, helperTimer: 0, expMult: 1, damageTakenMult: 1, revivesLeft: 0, cardChoices: 3,
+        hasSplash: false, splashRadiusMult: 1, critChance: 0, critDamage: 0, flatpowerLevel: 0, helperLevel: 0, helperTimer: 0, poisonLevel: 0, poisonTimer: 0, expMult: 1, damageTakenMult: 1, revivesLeft: 0, cardChoices: 3,
         laserLevel: 0, laserCooldown: 0,
         chainLevel: 0, bombLevel: 0, bombTimer: 0,
         tornadoLevel: 0, tornadoAngle: 0
@@ -1079,6 +1097,7 @@ function update(dt) {
     }
 
     updateHelper(dt);
+    updatePoison(dt);
 
     itemSpawnTimer += dt;
     if (itemSpawnTimer >= 30.0) {
@@ -1226,6 +1245,69 @@ function drawHelper() {
         ctx.font = '36px Arial';
         ctx.textAlign = 'center';
         ctx.fillText('👼', helper.x, helper.y + 12);
+    }
+    ctx.restore();
+}
+
+// '독': 주기마다 화면 안 랜덤한 위치에 독 구름을 설치. 구름 안의 적은 일정 간격으로 피해를 받음
+function updatePoison(dt) {
+    if (player.poisonLevel <= 0) return;
+    const lv = player.poisonLevel;
+
+    player.poisonTimer += dt;
+    if (player.poisonTimer >= POISON_BASE_INTERVAL) {
+        player.poisonTimer = 0;
+        const m = POISON_RADIUS;
+        for (let i = 0; i < poisonCount(lv); i++) {
+            poisons.push({
+                x: camera.x + m + Math.random() * (canvas.width - 2 * m),   // 화면 안쪽에만 설치
+                y: camera.y + m + Math.random() * (canvas.height - 2 * m),
+                radius: m,
+                life: poisonDuration(lv),
+                maxLife: poisonDuration(lv),
+                tick: 0
+            });
+        }
+    }
+
+    const dmg = poisonDmgPerTick();
+    for (let i = poisons.length - 1; i >= 0; i--) {
+        const p = poisons[i];
+        p.life -= dt;
+        p.tick += dt;
+        if (p.tick >= POISON_TICK) {
+            p.tick -= POISON_TICK;
+            for (const e of enemies) {
+                const r = e.isBoss ? 28 : e.tier.radius;
+                if (Math.hypot(e.x - p.x, e.y - p.y) < p.radius + r) e.hp -= dmg;   // 숫자 표시는 생략해 렉을 줄임
+            }
+        }
+        if (p.life <= 0) poisons.splice(i, 1);
+    }
+}
+
+function drawPoisons() {
+    if (poisons.length === 0) return;
+    const ready = poisonImg.complete && poisonImg.naturalWidth > 0;
+    ctx.save();
+    ctx.imageSmoothingEnabled = SPRITE_SMOOTHING;
+    if (SPRITE_SMOOTHING) ctx.imageSmoothingQuality = 'high';
+    for (const p of poisons) {
+        // 설치될 때 서서히 나타나고, 끝날 무렵 서서히 사라짐 + 가볍게 맥동
+        const alpha = Math.min(1, (p.maxLife - p.life) / 0.4, p.life / 0.6) * 0.9;
+        const size = p.radius * 2 * (1 + 0.05 * Math.sin(p.life * 6));
+        ctx.globalAlpha = Math.max(0, alpha);
+        if (ready) {
+            const ratio = poisonImg.naturalWidth / poisonImg.naturalHeight;
+            let w = size, h = size;
+            if (ratio >= 1) h = size / ratio; else w = size * ratio;
+            ctx.drawImage(poisonImg, p.x - w / 2, p.y - h / 2, w, h);
+        } else {
+            ctx.fillStyle = '#7dff3a';
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+            ctx.fill();
+        }
     }
     ctx.restore();
 }
@@ -1424,16 +1506,28 @@ function fireLaser() {
 // ========================================
 // 폭탄 공격
 // ========================================
+// 폭탄 설정: Lv.10에 도달하면 폭발 범위 안의 적을 뒤로 밀쳐냅니다
+const BOMB_KNOCKBACK_LEVEL = 10;     // 넉백이 생기는 폭탄 레벨
+const BOMB_KNOCKBACK_DISTANCE = 110; // 넉백 거리(px). 보스는 이 값의 30%만 밀려납니다
+const BOSS_KNOCKBACK_RATIO = 0.3;
+
+// 폭탄/회오리 피해 설정 (숫자만 바꾸면 레벨별 피해가 달라집니다)
+const BOMB_DMG_BASE = 0.70;          // 폭탄 1레벨 피해 (공격력 배율)
+const BOMB_DMG_PER_LEVEL = 0.15;     // 폭탄 레벨당 피해 증가율 (0.15 = 레벨마다 +15%)
+const TORNADO_DMG_PER_LEVEL = 0.12;  // 회오리 레벨당 피해 증가율 (0.12 = 레벨마다 +12%)
+
 function triggerBomb() {
-    let bombDamage = player.attackPower * 0.70;
+    let bombDamage = player.attackPower * BOMB_DMG_BASE * (1 + BOMB_DMG_PER_LEVEL * (player.bombLevel - 1));
     let radius =
         130 * (1 + (player.bombLevel - 1) * 0.10);
+    const knockback = player.bombLevel >= BOMB_KNOCKBACK_LEVEL ? BOMB_KNOCKBACK_DISTANCE : 0;
 
     createExplosion(
         player.x,
         player.y,
         radius,
-        bombDamage
+        bombDamage,
+        knockback
     );
 }
 
@@ -1441,12 +1535,19 @@ function triggerBomb() {
 // ========================================
 // 회오리 공격 판정
 // ========================================
+// 회오리 공전 반경: 기본 85px, 레벨 10이 되면 150px로 넓어짐
+const TORNADO_RADIUS_NORMAL = 85;
+const TORNADO_RADIUS_WIDE = 150;
+function tornadoOrbitDist() {
+    return player.tornadoLevel >= 10 ? TORNADO_RADIUS_WIDE : TORNADO_RADIUS_NORMAL;
+}
+
 function updateTornadoHits(dt) {
     let count = player.tornadoLevel;
-    let dist = 85;
+    let dist = tornadoOrbitDist();
 
     let baseDmgMult =
-        0.50 * (1 + (player.tornadoLevel - 1) * 0.05);
+        0.50 * (1 + (player.tornadoLevel - 1) * TORNADO_DMG_PER_LEVEL);
 
     let damage = player.attackPower * baseDmgMult;
 
@@ -1737,7 +1838,7 @@ function triggerChain(startEnemy) {
     }
 }
 // 💥 팡~ 터지는 역동적인 폭발 모션 이펙트 생성 함수
-function createExplosion(x, y, maxRadius, damage) {
+function createExplosion(x, y, maxRadius, damage, knockback = 0) {
     createParticles(x, y, '#ff5500', 22);
 
     visualEffects.push({
@@ -1756,6 +1857,14 @@ function createExplosion(x, y, maxRadius, damage) {
             const r = applyCrit(damage);
             e.hp -= r.damage;
             createDamageText(e.x, e.y, Math.round(r.damage), r.crit ? CRIT_TEXT_COLOR : '#ff5500');
+
+            // 넉백: 폭발 중심에서 바깥쪽으로 밀어냄 (보스는 덜 밀림)
+            if (knockback > 0) {
+                const d = Math.hypot(e.x - x, e.y - y) || 1;
+                const push = knockback * (e.isBoss ? BOSS_KNOCKBACK_RATIO : 1);
+                e.x += (e.x - x) / d * push;
+                e.y += (e.y - y) / d * push;
+            }
         }
     });
 }
@@ -2035,6 +2144,10 @@ function selectSkill(id) {
         if (player.helperLevel === 0) player.helperTimer = helperInterval(1) - HELPER_FIRST_DELAY;   // 처음 얻으면 곧바로 첫 등장
         player.helperLevel = Math.min(5, player.helperLevel + 1);
     }
+    if (id === 'poison') {
+        if (player.poisonLevel === 0) player.poisonTimer = POISON_BASE_INTERVAL - POISON_FIRST_DELAY;   // 처음 얻으면 곧바로 첫 설치
+        player.poisonLevel = Math.min(POISON_MAX_LEVEL, player.poisonLevel + 1);
+    }
     if (id === 'flatpower') { player.flatpowerLevel++; player.attackPower += 5; }
 
     document.getElementById('levelup-modal').classList.add('hidden');
@@ -2096,7 +2209,7 @@ function render() {
     // 회오리 렌더링 (PNG 이미지, 로딩 실패 시 기존 원형으로 대체)
     if (player.tornadoLevel > 0) {
         let count = player.tornadoLevel;
-        let dist = 85;
+        let dist = tornadoOrbitDist();
         const tornadoReady = tornadoImg.complete && tornadoImg.naturalWidth > 0;
 
         // 이미지 원본 비율을 유지하며 TORNADO_SPRITE_BOX 안에 맞춤
@@ -2251,6 +2364,7 @@ function render() {
     ctx.restore();
 
     drawHelper();          // 👼 아군 천사
+    drawPoisons();         // ☠️ 독 구름
     renderVisualEffects(); // 💥 폭발 애니메이션 및 연쇄전격 렌더링
     renderParticles();
     renderFloatingTexts();
@@ -2418,10 +2532,11 @@ function renderStatsPanel() {
     const maxTag = (lv, max) => (lv >= max ? ' MAX' : '');
     const skillLines = [];
     if (player.laserLevel > 0)   skillLines.push(`⚡ 레이저 Lv.${player.laserLevel}${maxTag(player.laserLevel, 13)}`);
-    if (player.bombLevel > 0)    skillLines.push(`💣 폭탄 Lv.${player.bombLevel}${maxTag(player.bombLevel, 13)}`);
+    if (player.bombLevel > 0)    skillLines.push(`💣 폭탄 Lv.${player.bombLevel}${maxTag(player.bombLevel, 10)}`);
     if (player.chainLevel > 0)   skillLines.push(`🌩️ 연쇄 전격 Lv.${player.chainLevel}${maxTag(player.chainLevel, 13)}`);
-    if (player.tornadoLevel > 0) skillLines.push(`🌪️ 회오리 Lv.${player.tornadoLevel}`);
+    if (player.tornadoLevel > 0) skillLines.push(`🌪️ 회오리 Lv.${player.tornadoLevel}${maxTag(player.tornadoLevel, 10)}`);
     if (player.helperLevel > 0)  skillLines.push(`👼 도와줘! Lv.${player.helperLevel}${maxTag(player.helperLevel, 5)}`);
+    if (player.poisonLevel > 0)  skillLines.push(`☠️ 독 Lv.${player.poisonLevel}${maxTag(player.poisonLevel, 7)}`);
     if (skillLines.length) { lines.push('— 스킬 —'); lines.push(...skillLines); }
 
     ctx.save();
@@ -2828,7 +2943,7 @@ function startPreload() {
     });
 
     const images = [
-        laserBeamImg, laserHitImg, tornadoImg, helpAngelImg,
+        laserBeamImg, laserHitImg, tornadoImg, helpAngelImg, poisonImg,
         expGemImg1, expGemImg2, expGemImg3, expGemImg4,
         ...bgImages,
         ...Object.values(ENEMY_IMAGES).filter(Boolean),
