@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <title>로판 세계는 오늘도 마물 퇴치중</title>
     <style>
        /* 강원교육새음체 */
@@ -363,6 +365,34 @@
             border-radius: 50%; width: 38px; height: 38px; font-size: 18px; cursor: pointer; padding: 0;
         }
         #sound-toggle:hover { background: rgba(255,255,255,0.18); }
+
+        /* ===== v24: 모바일 전체 화면 / 전체화면 버튼 / 카드 크게 ===== */
+        #game-container.touch-fill {
+            position: fixed; left: 0; top: 0; right: 0; bottom: 0;
+            width: 100vw; height: 100vh; height: 100dvh;
+            transform: none; border: 0; border-radius: 0; box-shadow: none;
+        }
+        #game-container.touch-fill canvas { width: 100%; height: 100%; }
+        #fs-toggle {
+            position: absolute; bottom: 14px; left: 60px; z-index: 15;
+            background: rgba(0,0,0,0.45); color: #fff; border: 1px solid rgba(255,255,255,0.35);
+            border-radius: 50%; width: 38px; height: 38px; font-size: 18px; cursor: pointer; padding: 0;
+        }
+        #fs-toggle:hover { background: rgba(255,255,255,0.18); }
+        @media (pointer: coarse) {
+            .card { width: 210px; height: 260px; }
+            .card-icon { font-size: 46px; }
+            .card-title { font-size: 19px; }
+            .card-desc { font-size: 14px; }
+        }
+
+        /* ===== v27: 메뉴 버튼 ===== */
+        #menu-btn {
+            position: absolute; top: 60px; left: 10px; z-index: 5;
+            background: rgba(0,0,0,0.45); color: #fff; border: 1px solid rgba(255,255,255,0.35);
+            border-radius: 6px; padding: 4px 10px; font-size: 13px; cursor: pointer;
+        }
+        #menu-btn:hover { background: rgba(255,255,255,0.18); }
     </style>
 </head>
 <body>
@@ -377,6 +407,8 @@
     <canvas id="gameCanvas" width="800" height="600"></canvas>
     <div id="announcement"></div>
     <button id="stats-toggle" class="hidden" onclick="toggleStats(); this.blur();">📊 정보 (H)</button>
+    <button id="menu-btn" class="hidden" onclick="openMenu(); this.blur();">⚙️ 메뉴</button>
+    <button id="fs-toggle" class="hidden" onclick="toggleFullscreen(); this.blur();">⛶</button>
     <button id="sound-toggle" onclick="SFX.toggleMute(); this.blur();">🔊</button>
     <button id="end-run-btn" class="hidden" onclick="finishRun(); this.blur();">🏁 게임 종료</button>
 
@@ -421,6 +453,26 @@
             <button class="btn" onclick="restartGame()">다시 도전</button>
             <button class="btn btn-sub" onclick="openShop('gameover')">🛠️ 영구 강화</button>
             <button class="btn btn-sub" onclick="backToCharacterSelect()">캐릭터 변경</button>
+        </div>
+    </div>
+
+    <!-- Menu Modal (⚙️ 메뉴) -->
+    <div id="menu-modal" class="modal hidden">
+        <h2 style="color: #00ffcc; font-size: 30px; margin: 0 0 18px; text-shadow: 0 0 12px #00ffcc;">메뉴</h2>
+        <div class="btn-row" style="flex-direction: column; align-items: center;">
+            <button class="btn btn-sub" style="min-width: 220px;" onclick="pauseGame()">⏸️ 일시정지</button>
+            <button class="btn btn-sub" style="min-width: 220px; background:#552233;" onclick="goMainMenu()">🏠 메인화면</button>
+            <button class="btn btn-sub" style="min-width: 220px;" onclick="closeMenu()">닫기</button>
+        </div>
+    </div>
+
+    <!-- Pause Modal (일시정지) -->
+    <div id="pause-modal" class="modal hidden">
+        <h2 style="color: #ffe600; font-size: 34px; margin: 0 0 8px; text-shadow: 0 0 12px #ffe600;">⏸️ 일시정지</h2>
+        <p style="color: #aaa; margin: 0 0 22px;">게임 내용이 그대로 저장되어 있어요. (ESC / P 키로도 재개)</p>
+        <div class="btn-row" style="flex-direction: column; align-items: center;">
+            <button class="btn" style="min-width: 220px;" onclick="resumeGame()">▶ 계속하기</button>
+            <button class="btn btn-sub" style="min-width: 220px; background:#552233;" onclick="goMainMenu()">🏠 메인화면</button>
         </div>
     </div>
 
@@ -499,6 +551,9 @@ const BASE_PLAYER_SPEED = 3.2;
 // 적 기본 이동속도
 const BASE_ENEMY_SPEED = 3;
 
+// 보스/분열 몬스터 기준 속도. 플레이어 이동속도(player.speed)와는 연결되어 있지 않음
+const BASE_BOSS_SPEED = 3.2;
+
 // 치명타 기본 배율 (여기에 '치명타 피해' 스킬이 +10%씩 더해집니다)
 const CRIT_BASE_MULT = 2.0;
 
@@ -532,10 +587,10 @@ const ENEMY_IMAGE_FILES = {
     Green: "monster4.png",
     Blue: "monster5.png",
     Indigo: "monster6.png",
-    "Ice cream": "monster7.png",
-    Pudding: "monster8.png",
-    Bingsu: "monster9.png",
-    Choco: "monster10.png",
+    Bingsu: "monster7.png",
+    Choco: "monster8.png",
+    "Ice-cream": "monster9.png",
+    Pudding: "monster10.png",
     Violet: "monster11.png",
     Boss10: "boss10.png",
     Boss20: "boss20.png",
@@ -725,7 +780,7 @@ let player = {
     x: 0, y: 0, radius: 12, hp: 100, maxHp: 100, speed: 3.2,
     level: 1, exp: 0, maxExp: 8, invincibleTimer: 0, facingAngle: 0, magnetRange: 100,
     attackPower: 25, attackSpeedRatio: 1.0, bulletCount: 1, pierceCount: 1,
-    hasSplash: false, splashRadiusMult: 1, critChance: 0, critDamage: 0, flatpowerLevel: 0, helperLevel: 0, helperTimer: 0, poisonLevel: 0, poisonTimer: 0, expMult: 1, damageTakenMult: 1, revivesLeft: 0, cardChoices: 3,
+    hasSplash: false, splashRadiusMult: 1, critChance: 0, critDamage: 0, flatpowerLevel: 0, helperLevel: 0, helperTimer: 0, poisonLevel: 0, poisonTimer: 0, freezeLevel: 0, freezeTimer: 0, expMult: 1, damageTakenMult: 1, revivesLeft: 0, cardChoices: 3,
     laserLevel: 0, laserCooldown: 0,
     chainLevel: 0, bombLevel: 0, bombTimer: 0,
     tornadoLevel: 0, tornadoAngle: 0
@@ -751,9 +806,9 @@ const RAINBOW_TIERS = [
     { name: 'Green', color: '#2ecc71', hp: 200, speedMult: 0.73, radius: 12, exp: 18 },
     { name: 'Blue', color: '#3498db', hp: 340, speedMult: 0.68, radius: 13, exp: 30, isSplitter: true },
     { name: 'Indigo', color: '#8e44ad', hp: 550, speedMult: 0.72, radius: 14, exp: 60 },
-  { name: 'Ice cream', color: '#8e44ad', hp: 800, speedMult: 0.75, radius: 14, exp: 80 }, { name: 'Pudding', color: '#8e44ad', hp: 800, speedMult: 0.73, radius: 14, exp: 120 },
-{ name: 'Bingsu', color: '#8e44ad', hp: 1200, speedMult: 0.70, radius: 15, exp: 150 },
-{ name: 'Choco', color: '#8e44ad', hp: 1700, speedMult: 0.75, radius: 15, exp: 200 },
+  { name: 'Bingsu', color: '#8e44ad', hp: 800, speedMult: 0.75, radius: 14, exp: 80 }, { name: 'Choco', color: '#8e44ad', hp: 800, speedMult: 0.73, radius: 14, exp: 120 },
+{ name: 'Ice-cream', color: '#8e44ad', hp: 1200, speedMult: 0.70, radius: 15, exp: 150 },
+{ name: 'Pudding', color: '#8e44ad', hp: 1700, speedMult: 0.75, radius: 15, exp: 200 },
     { name: 'Violet', color: '#e056fd', hp: 2700, speedMult: 0.80, radius: 16, exp: 300 }
 ];
 
@@ -767,17 +822,17 @@ const RAINBOW_TIERS = [
 //   배경 0 (backg_1): 시작.  Lv.1~5 → Red(monster1) / Lv.6~ → Orange(monster2)
 //   배경 1 (backg_2): 10레벨 보스 '등장' 때부터.  Yellow, Green  (monster3, 4)
 //   배경 2 (backg_3): 20레벨 보스 '등장' 때부터.  Blue, Indigo   (monster5, 6)
-//   배경 3 (backg_4): 30레벨 보스 '등장' 때부터.  Ice cream, Pudding (monster7, 8)
-//   배경 4 (backg_5): 40레벨 보스 '등장' 때부터.  Bingsu, Choco   (monster9, 10)
-//   배경 5 (backg_6): 40레벨 보스를 처치했고 + Lv.50 이상일 때.  Choco, Violet (monster10, 11)
+//   배경 3 (backg_4): 30레벨 보스 '등장' 때부터.  Bingsu, Choco (monster7, 8)
+//   배경 4 (backg_5): 40레벨 보스 '등장' 때부터.  Ice-cream, Pudding (monster9, 10)
+//   배경 5 (backg_6): 40레벨 보스를 처치했고 + Lv.50 이상일 때.  Pudding, Violet (monster10, 11)
 //   배경 6 (backg_7): 60레벨 보스 처치 후(게임 클리어).  Violet (monster11)
 const STAGE_MONSTERS = [
     null,                     // 0번은 아래 EARLY_MONSTERS 를 레벨로 나눠서 사용
     ['Yellow', 'Green'],
     ['Blue', 'Indigo'],
-    ['Ice cream', 'Pudding'],
     ['Bingsu', 'Choco'],
-    ['Choco', 'Violet'],
+    ['Ice-cream', 'Pudding'],
+    ['Pudding', 'Violet'],
     ['Violet']
 ];
 const EARLY_MONSTERS = [
@@ -790,7 +845,7 @@ const BOSS_LEVELS = [10, 20, 30, 40, 60];
 const BOSS_APPEAR_STAGE = { 10: 1, 20: 2, 30: 3, 40: 4 };
 
 // 스킬 최대 레벨 (여기에 없는 스킬은 제한 없음)
-const SKILL_MAX_LEVEL = { laser: 13, bomb: 10, chain: 13, tornado: 10, flatpower: 5, helper: 5, poison: 7 };
+const SKILL_MAX_LEVEL = { laser: 10, bomb: 10, chain: 13, tornado: 10, flatpower: 5, helper: 5, poison: 7, freeze: 7 };
 
 // ===== '도와줘!' 스킬 설정 (아군 천사) =====
 const HELPER_BASE_INTERVAL = 15;    // Lv.1 등장 주기(초): 이 시간마다 한 번 나타남
@@ -811,7 +866,130 @@ const POISON_RADIUS = 60;           // 독 구름의 반지름(px, 충돌 범위
 const POISON_TICK = 0.5;            // 지속 피해를 주는 간격(초)
 const poisonImg = new Image();
 poisonImg.src = 'images/poison_1.png';
-let poisons = [];                   // 지금 깔려 있는 독 구름들
+let poisons = [];
+
+// ===== 플라즈마 토네이도 (레이저 Lv.10 + 회오리 Lv.10 진화) =====
+const PLASMA_BLADES = 6;             // 회전하는 플라즈마 광선 개수
+const PLASMA_INNER = 40;             // 광선 시작 거리(플레이어 중심에서)
+const PLASMA_LENGTH = 230;           // 광선 길이
+const PLASMA_SPIN = 4.0;             // 회전 속도(rad/s)
+const PLASMA_DMG_PER_SEC = 8;        // 광선이 닿아 있는 동안 1초당 피해 (공격력 배율) - 광선 1개 기준
+const PLASMA_CUT_INTERVAL = 0.25;    // 절단 이펙트/피해 숫자 표시 간격(초, 렉 방지용으로 묶어서 표시)
+let plasmaAngle = 0;
+
+function isPlasmaMode() {
+    return player.laserLevel >= 10 && player.tornadoLevel >= 10;
+}
+
+function getPlasmaBlades() {
+    const list = [];
+    for (let i = 0; i < PLASMA_BLADES; i++) {
+        const a = plasmaAngle + (Math.PI * 2 / PLASMA_BLADES) * i;
+        list.push({
+            angle: a,
+            x1: player.x + Math.cos(a) * PLASMA_INNER,
+            y1: player.y + Math.sin(a) * PLASMA_INNER,
+            x2: player.x + Math.cos(a) * (PLASMA_INNER + PLASMA_LENGTH),
+            y2: player.y + Math.sin(a) * (PLASMA_INNER + PLASMA_LENGTH)
+        });
+    }
+    return list;
+}
+
+function updatePlasma(dt) {
+    if (!isPlasmaMode()) return;
+    plasmaAngle += dt * PLASMA_SPIN;
+    const blades = getPlasmaBlades();
+    const dmgPerSec = player.attackPower * PLASMA_DMG_PER_SEC;
+
+    for (const e of enemies) {
+        const r = e.isBoss ? 28 : e.tier.radius;
+        const center = { x: e.x, y: e.y };
+        let total = 0;
+        for (const b of blades) {
+            if (distToSegment(center, { x: b.x1, y: b.y1 }, { x: b.x2, y: b.y2 }) < 9 + r) {
+                total += dmgPerSec * dt;     // 여러 광선에 동시에 맞으면 피해가 겹침 (다중 타격)
+            }
+        }
+        if (total <= 0) continue;
+
+        e.hp -= total;
+        e.plasmaAcc = (e.plasmaAcc || 0) + total;
+        e.plasmaCut = (e.plasmaCut || 0) - dt;
+        if (e.plasmaCut <= 0) {
+            // 일정 간격마다 모아서 한 번만 표시 (숫자/파티클 개수를 줄여 렉 방지)
+            e.plasmaCut = PLASMA_CUT_INTERVAL;
+            createDamageText(e.x, e.y, Math.round(e.plasmaAcc), '#9ff3ff');
+            createParticles(e.x, e.y, '#d8fbff', 4);
+            visualEffects.push({ type: 'slash', x: e.x, y: e.y, angle: plasmaAngle, life: 0.18, maxLife: 0.18 });
+            e.plasmaAcc = 0;
+        }
+    }
+}
+
+function drawPlasma() {
+    if (!isPlasmaMode()) return;
+    const beamReady = laserBeamImg.complete && laserBeamImg.naturalWidth > 0;
+    const hitReady = laserHitImg.complete && laserHitImg.naturalWidth > 0;
+    ctx.save();
+    // 회전 궤도 (옅은 원)
+    ctx.globalAlpha = 0.3;
+    ctx.strokeStyle = '#8ff0ff';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, PLASMA_INNER, 0, Math.PI * 2);
+    ctx.stroke();
+
+    for (const b of getPlasmaBlades()) {
+        ctx.save();
+        ctx.translate(player.x, player.y);
+        ctx.rotate(b.angle);
+        // 바깥 글로우 (그림자 대신 반투명 띠)
+        ctx.globalAlpha = 0.22;
+        ctx.fillStyle = '#00ccff';
+        ctx.fillRect(PLASMA_INNER, -18, PLASMA_LENGTH, 36);
+        // 광선 본체 (laser_beam.png)
+        ctx.globalAlpha = 0.9;
+        if (beamReady) ctx.drawImage(laserBeamImg, PLASMA_INNER, -33, PLASMA_LENGTH, 66);
+        else { ctx.fillStyle = '#bafaff'; ctx.fillRect(PLASMA_INNER, -5, PLASMA_LENGTH, 10); }
+        // 중심 흰 선
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(PLASMA_INNER, -2, PLASMA_LENGTH, 4);
+        ctx.restore();
+
+        // 광선 끝 충격 이펙트 (laser_hit.png)
+        if (hitReady) {
+            const tx = player.x + Math.cos(b.angle) * (PLASMA_INNER + PLASMA_LENGTH);
+            const ty = player.y + Math.sin(b.angle) * (PLASMA_INNER + PLASMA_LENGTH);
+            ctx.globalAlpha = 0.9;
+            ctx.drawImage(laserHitImg, tx - 28, ty - 28, 56, 56);
+        }
+    }
+    ctx.restore();
+}
+
+// 진화 순간 상단 문구
+function checkEvolution() {
+    if (isPlasmaMode() && !player.plasmaShown) {
+        player.plasmaShown = true;
+        showAnnouncement('🌀 스킬 진화! 플라즈마 토네이도', 4000);
+        SFX.play('boss');
+    }
+}
+
+// ===== 빙결 스킬 설정 =====
+const FREEZE_MAX_LEVEL = 7;          // 최대 레벨
+const FREEZE_BASE_RADIUS = 120;      // Lv.1 파동 최대 반경(px)
+const FREEZE_RADIUS_STEP = 25;       // 레벨당 반경 증가(px)            → Lv.7 = 270px
+const FREEZE_BASE_COOLDOWN = 6.0;    // Lv.1 발동 주기(초)
+const FREEZE_COOLDOWN_STEP = 0.4;    // 레벨당 주기 감소(초)            → Lv.7 = 3.6초
+const FREEZE_PULSE_TIME = 0.7;       // 파동이 최대 반경까지 퍼지는 시간(초)
+const FREEZE_DURATION = 2.0;         // 동결 지속 시간(초)
+const FREEZE_BOSS_IMMUNE = true;     // true면 보스는 얼지 않음
+let freezePulses = [];               // 퍼지고 있는 파동들
+let iceShards = [];                  // 얼 때 튀는 얼음 파편 파티클
+const ICE_SHARD_MAX = 60;            // 파편 최대 개수 (렉 방지)                   // 지금 깔려 있는 독 구름들
 
 // 레벨별: 한 번에 설치하는 개수 / 지속 시간 / 틱당 피해(공격력 배율)
 function poisonCount(lv) { return 1 + Math.floor(lv / 2); }                 // 1,2,2,3,3,4,4
@@ -828,10 +1006,10 @@ function isSkillAvailable(skill) {
 }
 
 const SKILLS = [
-    { id: 'laser', title: '레이저', icon: '⚡', desc: '이동 방향으로 관통 레이저 발사. (최대 Lv.13 / 13레벨이 되면 360도)' },
+    { id: 'laser', title: '레이저', icon: '⚡', desc: '이동 방향으로 관통 레이저 발사. (최대 Lv.10 / 10레벨이 되면 360도 레이저. 회오리도 10이면 플라즈마 토네이도로 진화)' },
     { id: 'bomb', title: '폭탄', icon: '💣', desc: '3초마다 주변에 광역 데미지. (레벨당 범위 +10%, 피해 +15%, 최대 Lv.10 / Lv.10이 되면 적을 뒤로 밀쳐냅니다)' },
     { id: 'chain', title: '번개', icon: '🌩️', desc: '탄환 적중 시 주변 적 연쇄 번개. (레벨당 확률+5%, 데미지+3%, 연쇄+1, 최대 Lv.13)' },
-    { id: 'tornado', title: '회오리', icon: '🌪️', desc: '주변을 맴돌며 지속 데미지. (레벨당 개수+1, 속도 +5%, 피해 +12%, 최대 Lv.10 / Lv.10이 되면 회전 반경이 넓어집니다)' },
+    { id: 'tornado', title: '회오리', icon: '🌪️', desc: '주변을 맴돌며 지속 데미지. (레벨당 개수+1, 속도 +5%, 피해 +12%, 최대 Lv.10 / Lv.10이 되면 회전 반경이 넓어집니다. 레이저도 10이면 플라즈마 토네이도로 진화)' },
     { id: 'magnet', title: '자석 강화', icon: '🧲', desc: '경험치 조각을 끌어당기는 자석 흡수 범위가 대폭 확장됩니다.' },
     { id: 'bullet', title: '투사체 증가', icon: '🏹', desc: '발사되는 탄환의 개수가 +1개 증가합니다.' },
     { id: 'pierce', title: '관통력 증가', icon: '🗡️', desc: '탄환이 적을 뚫고 지나가는 횟수가 +1회 증가합니다.' },
@@ -842,6 +1020,7 @@ const SKILLS = [
     { id: 'critdmg', title: '치명타 피해', icon: '💢', desc: '치명타 피해가 +10% 증가합니다. (치명타 기본 2배)' },
     { id: 'helper', title: '도와줘!', icon: '👼', desc: '아군 천사가 나타나 내 공격 능력 그대로 적을 공격하고 사라집니다. (15초마다 3초간 / 레벨당 주기 -1초, 활동 +1초 / 최대 Lv.5)' },
     { id: 'poison', title: '독', icon: '☠️', desc: '화면 안 랜덤한 곳에 독 구름을 설치합니다. 닿은 적이 지속 피해를 받습니다. (6초마다 설치 / 레벨마다 피해·지속시간·개수 증가 / 최대 Lv.7)' },
+    { id: 'freeze', title: '빙결', icon: '❄️', desc: '내 발밑에서 얼음 파동이 퍼져 닿은 몬스터를 2초간 얼립니다. (레벨당 범위 +25px, 주기 -0.4초, 보스 제외 / 최대 Lv.7)' },
     { id: 'flatpower', title: '공격력 +5', icon: '💪', desc: '공격력이 +5 증가합니다. (한 판에 최대 5번)' }
 ];
 
@@ -849,6 +1028,10 @@ window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
 window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 window.addEventListener('keydown', e => {
     if (e.key.toLowerCase() === 'h' && !e.repeat && (gameState === 'PLAYING')) toggleStats();
+    if ((e.key === 'Escape' || e.key.toLowerCase() === 'p') && !e.repeat) {
+        if (gameState === 'PLAYING') pauseGame();
+        else if (gameState === 'PAUSED') resumeGame();
+    }
 });
 
 //안내문구 폰트 바꾸려고 수정한 곳
@@ -962,6 +1145,7 @@ function startRun(charType) {
     resetJoystick();
     gameState = 'PLAYING';
     document.getElementById('stats-toggle').classList.remove('hidden');
+    document.getElementById('menu-btn').classList.remove('hidden');
     requestAnimationFrame(gameLoop);
 }
 
@@ -994,6 +1178,8 @@ function resetGame() {
     bossKills = 0;
     helper = null;
     poisons = [];
+    freezePulses = [];
+    iceShards = [];
     clearSnapshot = null;
     bgStage = 0; bgPrevStage = 0; bgFade = 1;
     boss40Killed = false;
@@ -1015,7 +1201,7 @@ function resetGame() {
         x: 0, y: 0, radius: 12, hp: 100, maxHp: 100, speed: 3.2,
         level: 1, exp: 0, maxExp: 8, invincibleTimer: 0, facingAngle: 0, magnetRange: 100,
         attackPower: 25, attackSpeedRatio: 1.0, bulletCount: 1, pierceCount: 1,
-        hasSplash: false, splashRadiusMult: 1, critChance: 0, critDamage: 0, flatpowerLevel: 0, helperLevel: 0, helperTimer: 0, poisonLevel: 0, poisonTimer: 0, expMult: 1, damageTakenMult: 1, revivesLeft: 0, cardChoices: 3,
+        hasSplash: false, splashRadiusMult: 1, critChance: 0, critDamage: 0, flatpowerLevel: 0, helperLevel: 0, helperTimer: 0, poisonLevel: 0, poisonTimer: 0, freezeLevel: 0, freezeTimer: 0, expMult: 1, damageTakenMult: 1, revivesLeft: 0, cardChoices: 3,
         laserLevel: 0, laserCooldown: 0,
         chainLevel: 0, bombLevel: 0, bombTimer: 0,
         tornadoLevel: 0, tornadoAngle: 0
@@ -1026,6 +1212,10 @@ let autoAttackTimer = 0;
 let bossSpawnedForLevel = 0;
 
 function gameLoop(timestamp) {
+    if (gameState === 'PAUSED') {          // 일시정지: 계산 X, 그리기 X (마지막 화면 그대로 유지)
+        requestAnimationFrame(gameLoop);
+        return;
+    }
     if (!lastTime) lastTime = timestamp;
     let dt = (timestamp - lastTime) / 1000;
     if (dt > 0.1) dt = 0.1;
@@ -1074,7 +1264,7 @@ function update(dt) {
         fireMainProjectiles();
     }
 
-    if (player.laserLevel > 0) {
+    if (player.laserLevel > 0 && !isPlasmaMode()) {   // 플라즈마 토네이도 상태에서는 일반 레이저 대신 회전 링
         player.laserCooldown += dt * player.attackSpeedRatio;
         if (player.laserCooldown >= 2.5) {
             player.laserCooldown = 0;
@@ -1098,6 +1288,8 @@ function update(dt) {
 
     updateHelper(dt);
     updatePoison(dt);
+    updateFreeze(dt);
+    updatePlasma(dt);
 
     itemSpawnTimer += dt;
     if (itemSpawnTimer >= 30.0) {
@@ -1148,6 +1340,7 @@ function spawnEnemies(dt) {
     // [초반 완화 1] 동시에 살아있는 적의 최대 수: 시간이 지날수록 서서히 늘어남 (초반에 화면이 꽉 차는 것 방지)
     if (enemies.length >= 50 + gameTime * 0.8) return;
     // [초반 완화 2] 처음엔 적이 천천히 나오고, 300초에 걸쳐 원래 속도로 올라옴
+    // 적 스폰은 공격속도(attackSpeedRatio)와 무관하게 시간/처치 수로만 결정됨
     let spawnRate = Math.min(8, 1.8 + killCount / 25) * Math.min(1, 0.5 + gameTime / 300);
     if (Math.random() < spawnRate * dt) {
         let names;
@@ -1277,9 +1470,9 @@ function updatePoison(dt) {
         p.tick += dt;
         if (p.tick >= POISON_TICK) {
             p.tick -= POISON_TICK;
+            // 피해 범위 = 그려지는 이미지 크기(반지름 p.radius). 적의 '중심'이 이미지 안에 있을 때만 피해
             for (const e of enemies) {
-                const r = e.isBoss ? 28 : e.tier.radius;
-                if (Math.hypot(e.x - p.x, e.y - p.y) < p.radius + r) e.hp -= dmg;   // 숫자 표시는 생략해 렉을 줄임
+                if (Math.hypot(e.x - p.x, e.y - p.y) < p.radius) e.hp -= dmg;   // 숫자 표시는 생략해 렉을 줄임
             }
         }
         if (p.life <= 0) poisons.splice(i, 1);
@@ -1310,6 +1503,197 @@ function drawPoisons() {
         }
     }
     ctx.restore();
+}
+
+// ----- 빙결 스킬 로직 -----
+function freezeRadius(lv) { return FREEZE_BASE_RADIUS + (lv - 1) * FREEZE_RADIUS_STEP; }
+function freezeCooldown(lv) { return FREEZE_BASE_COOLDOWN - (lv - 1) * FREEZE_COOLDOWN_STEP; }
+function isFrozen(e) { return e.frozenUntil !== undefined && e.frozenUntil > gameTime; }
+function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
+function triggerFreeze() {
+    freezePulses.push({
+        x: player.x, y: player.y,        // 발동한 순간의 발밑에서 시작
+        age: 0,
+        maxR: freezeRadius(player.freezeLevel),
+        hit: new Set()                   // 이번 파동에 이미 얼린 몬스터
+    });
+}
+
+function spawnIceShards(x, y) {
+    // 파편은 최대 ICE_SHARD_MAX 개까지만 유지 (많이 얼어도 파티클이 쌓이지 않게)
+    for (let i = 0; i < 6; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const sp = 40 + Math.random() * 60;
+        iceShards.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.5, max: 0.5 });
+    }
+    if (iceShards.length > ICE_SHARD_MAX) iceShards.splice(0, iceShards.length - ICE_SHARD_MAX);
+}
+
+function updateFreeze(dt) {
+    // 발동 주기
+    if (player.freezeLevel > 0) {
+        player.freezeTimer += dt;
+        if (player.freezeTimer >= freezeCooldown(player.freezeLevel)) {
+            player.freezeTimer = 0;
+            triggerFreeze();
+        }
+    }
+
+    // 파동 진행 + 닿은 몬스터 동결
+    for (let i = freezePulses.length - 1; i >= 0; i--) {
+        const p = freezePulses[i];
+        p.age += dt;
+        const t = Math.min(1, p.age / FREEZE_PULSE_TIME);
+        const r = p.maxR * easeOutCubic(t);
+
+        for (const e of enemies) {
+            if (p.hit.has(e)) continue;
+            if (FREEZE_BOSS_IMMUNE && e.isBoss) continue;
+            const er = e.isBoss ? 28 : e.tier.radius;
+            if (Math.hypot(e.x - p.x, e.y - p.y) <= r + er) {
+                p.hit.add(e);
+                if (!isFrozen(e)) spawnIceShards(e.x, e.y);   // 새로 얼 때만 파편
+                e.frozenUntil = gameTime + FREEZE_DURATION;
+            }
+        }
+        if (t >= 1) freezePulses.splice(i, 1);
+    }
+
+    // 얼음 파편 이동
+    for (let i = iceShards.length - 1; i >= 0; i--) {
+        const s = iceShards[i];
+        s.x += s.vx * dt;
+        s.y += s.vy * dt;
+        s.life -= dt;
+        if (s.life <= 0) iceShards.splice(i, 1);
+    }
+}
+
+// ----- 빙결 렌더링 (이미지 없이 Canvas 2D로만 그림) -----
+function drawFreezeEffects() {
+    drawFreezePulses();
+    drawFrozenEnemies();
+    drawIceShards();
+}
+
+function drawFreezePulses() {
+    if (freezePulses.length === 0) return;
+    ctx.save();
+    for (const p of freezePulses) {
+        const t = p.age / FREEZE_PULSE_TIME;
+        const r = p.maxR * easeOutCubic(Math.min(1, t));
+        if (r < 1) continue;
+        const a = 1 - t;
+        // 안쪽 옅은 얼음색 (그라데이션 대신 반투명 원 - 가볍고 비슷하게 보임)
+        ctx.globalAlpha = 0.16 * a;
+        ctx.fillStyle = '#a0e6ff';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+        ctx.fill();
+        // 바깥 링 (그림자 없이 두께로만 표현)
+        ctx.globalAlpha = 0.9 * a;
+        ctx.strokeStyle = '#c8f5ff';
+        ctx.lineWidth = 2 + 4 * (1 - t);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+    ctx.restore();
+}
+
+// 동결 표시 이미지를 크기별로 한 번만 그려서 재사용 (그림자 효과 없이 얇은 선과 원으로 표현)
+const frozenSpriteCache = {};
+function getFrozenSprite(half) {
+    const key = Math.round(half);
+    if (frozenSpriteCache[key]) return frozenSpriteCache[key];
+    const size = Math.ceil(half * 2) + 8, c = size / 2;
+    const cv = document.createElement('canvas');
+    cv.width = size; cv.height = size;
+    const g = cv.getContext('2d');
+    // 몸 위 얼음색 덧칠
+    g.globalAlpha = 0.45;
+    g.fillStyle = '#7fd8ff';
+    g.beginPath(); g.arc(c, c, half * 0.8, 0, Math.PI * 2); g.fill();
+    // 얼음 테두리
+    g.globalAlpha = 1;
+    g.strokeStyle = '#d8f8ff';
+    g.lineWidth = 3;
+    g.beginPath(); g.arc(c, c, half * 0.9, 0, Math.PI * 2); g.stroke();
+    // 6방향 결정 무늬
+    g.lineWidth = 2;
+    g.beginPath();
+    for (let i = 0; i < 6; i++) {
+        const a = (Math.PI / 3) * i;
+        g.moveTo(c, c);
+        g.lineTo(c + Math.cos(a) * half * 0.7, c + Math.sin(a) * half * 0.7);
+    }
+    g.stroke();
+    frozenSpriteCache[key] = cv;
+    return cv;
+}
+
+function drawFrozenEnemies() {
+    let any = false;
+    for (const e of enemies) {
+        if (!isFrozen(e)) continue;
+        any = true;
+        const half = e.isBoss ? BOSS_SPRITE_SIZE / 2 : ENEMY_SPRITE_SIZE / 2;
+        // 화면 밖이면 그리지 않음
+        if (e.x < camera.x - half || e.x > camera.x + canvas.width + half ||
+            e.y < camera.y - half || e.y > camera.y + canvas.height + half) continue;
+        const left = e.frozenUntil - gameTime;
+        const k = Math.min(1, (FREEZE_DURATION - left) / 0.15, left / 0.3);  // 얼 때/풀릴 때 페이드
+        const sprite = getFrozenSprite(half);
+        ctx.globalAlpha = k;
+        ctx.drawImage(sprite, e.x - sprite.width / 2, e.y - sprite.height / 2);
+    }
+    if (any) ctx.globalAlpha = 1;
+}
+
+function drawIceShards() {
+    if (iceShards.length === 0) return;
+    ctx.save();
+    ctx.fillStyle = '#d8f8ff';
+    for (const s of iceShards) {
+        ctx.globalAlpha = Math.max(0, s.life / s.max);
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.restore();
+}
+
+// ===== 메뉴 / 일시정지 / 메인화면 =====
+function openMenu() {
+    if (gameState !== 'PLAYING' && gameState !== 'PAUSED') return;
+    document.getElementById('menu-modal').classList.remove('hidden');
+}
+function closeMenu() {
+    document.getElementById('menu-modal').classList.add('hidden');
+}
+function pauseGame() {
+    if (gameState !== 'PLAYING') return;
+    closeMenu();
+    gameState = 'PAUSED';
+    resetJoystick();                       // 손을 떼고 있던 조이스틱도 해제
+    document.getElementById('pause-modal').classList.remove('hidden');
+}
+function resumeGame() {
+    if (gameState !== 'PAUSED') return;
+    gameState = 'PLAYING';
+    lastTime = 0;                          // 멈춰 있던 시간이 한꺼번에 흘러가지 않도록
+    document.getElementById('pause-modal').classList.add('hidden');
+}
+// 메인 화면으로: 이번 판은 저장하지 않고 종료합니다 (코인 지급 없음)
+function goMainMenu() {
+    gameState = 'START';
+    resetJoystick();
+    ['menu-modal', 'pause-modal', 'levelup-modal', 'gameover-modal', 'shop-modal', 'character-select-modal']
+        .forEach(id => document.getElementById(id).classList.add('hidden'));
+    ['stats-toggle', 'end-run-btn', 'menu-btn'].forEach(id => document.getElementById(id).classList.add('hidden'));
+    refreshCoinLabels();
+    document.getElementById('start-modal').classList.remove('hidden');
 }
 
 function playerMainDps() {
@@ -1349,7 +1733,7 @@ function spawnBoss(levelTier) {
         y: player.y + Math.sin(angle) * 480,
         tier: { name: `Boss${levelTier}`, color: '#ffffff', radius: 28 },
         hp: bossHp, maxHp: bossHp,
-        speed: BASE_PLAYER_SPEED * bs.speed,
+        speed: BASE_BOSS_SPEED * bs.speed,
         stats: bs,
         isBoss: true,
         bossLevel: levelTier,
@@ -1472,12 +1856,12 @@ function getLaserScreenEnd(x, y, angle) {
 // ========================================
 function fireLaser() {
     const count = player.laserLevel;
-    const isFullCircle = count >= 13;
-    const actualBeams = isFullCircle ? 13 : count;
+    const isFullCircle = count >= 10;
+    const actualBeams = isFullCircle ? 10 : count;
 
     for (let i = 0; i < actualBeams; i++) {
         const angle = isFullCircle
-            ? (Math.PI * 2 / 13) * i
+            ? (Math.PI * 2 / 10) * i
             : player.facingAngle +
               (i - (actualBeams - 1) / 2) * 0.25;
 
@@ -1895,6 +2279,18 @@ function renderVisualEffects() {
             ctx.lineTo(fx.x2, fx.y2);
             ctx.stroke();
             ctx.restore();
+        } else if (fx.type === 'slash') {
+            // 절단 자국: 광선 방향으로 짧은 흰 선이 번쩍이고 사라짐
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, fx.life / fx.maxLife);
+            ctx.strokeStyle = '#e6fbff';
+            ctx.lineWidth = 3;
+            const c = Math.cos(fx.angle), s = Math.sin(fx.angle);
+            ctx.beginPath();
+            ctx.moveTo(fx.x - c * 22, fx.y - s * 22);
+            ctx.lineTo(fx.x + c * 22, fx.y + s * 22);
+            ctx.stroke();
+            ctx.restore();
         } else if (fx.type === 'boom') {
             // 💥 팡~ 터지는 애니메이션 렌더링 (외곽 충격파 링 + 내부 퍼지는 불꽃 + 파편)
             ctx.save();
@@ -1939,8 +2335,10 @@ function updateEnemies(dt) {
         let dist = Math.hypot(player.x - e.x, player.y - e.y);
         let angle = Math.atan2(player.y - e.y, player.x - e.x);
 
-        e.x += Math.cos(angle) * e.speed;
-        e.y += Math.sin(angle) * e.speed;
+        if (!isFrozen(e)) {               // 동결 상태면 이동하지 않음
+            e.x += Math.cos(angle) * e.speed;
+            e.y += Math.sin(angle) * e.speed;
+        }
 
         if (e.isBoss && e.stats.bullets > 0 && dist < 450) {
             e.shootTimer += dt;
@@ -1985,7 +2383,7 @@ function updateEnemies(dt) {
                     enemies.push({
                         x: e.x + (s === 0 ? 12 : -12), y: e.y, tier: orangeTier,
                         hp: orangeTier.hp, maxHp: orangeTier.hp,
-                        speed: BASE_PLAYER_SPEED * orangeTier.speedMult
+                        speed: BASE_BOSS_SPEED * orangeTier.speedMult
                     });
                 }
             }
@@ -2128,7 +2526,7 @@ function triggerLevelUp() {
 
 function selectSkill(id) {
     SFX.play('select');
-    if (id === 'laser') player.laserLevel = Math.min(13, player.laserLevel + 1);
+    if (id === 'laser') player.laserLevel = Math.min(10, player.laserLevel + 1);
     if (id === 'bomb') player.bombLevel = Math.min(13, player.bombLevel + 1);
     if (id === 'chain') player.chainLevel = Math.min(13, player.chainLevel + 1);
     if (id === 'tornado') player.tornadoLevel++;
@@ -2148,8 +2546,13 @@ function selectSkill(id) {
         if (player.poisonLevel === 0) player.poisonTimer = POISON_BASE_INTERVAL - POISON_FIRST_DELAY;   // 처음 얻으면 곧바로 첫 설치
         player.poisonLevel = Math.min(POISON_MAX_LEVEL, player.poisonLevel + 1);
     }
+    if (id === 'freeze') {
+        if (player.freezeLevel === 0) player.freezeTimer = freezeCooldown(1) - 2;   // 처음 얻으면 2초 뒤 첫 파동
+        player.freezeLevel = Math.min(FREEZE_MAX_LEVEL, player.freezeLevel + 1);
+    }
     if (id === 'flatpower') { player.flatpowerLevel++; player.attackPower += 5; }
 
+    checkEvolution();
     document.getElementById('levelup-modal').classList.add('hidden');
     player.invincibleTimer = 2.0;
     gameState = 'PLAYING';
@@ -2198,13 +2601,17 @@ function render() {
     }
 });
 
+    ctx.save();
+    ctx.font = `${Math.round(20 * ITEM_SCALE)}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
     items.forEach(it => {
-        ctx.font = '20px Arial';
         let icon = '💚';
         if (it.type === 'magnet') icon = '🧲';
         if (it.type === 'shield') icon = '🛡️';
-        ctx.fillText(icon, it.x - 10, it.y + 7);
+        ctx.fillText(icon, it.x, it.y);
     });
+    ctx.restore();
 
     // 회오리 렌더링 (PNG 이미지, 로딩 실패 시 기존 원형으로 대체)
     if (player.tornadoLevel > 0) {
@@ -2256,13 +2663,10 @@ function render() {
     // 1. 바깥쪽 에너지 빛
     ctx.globalAlpha = 0.0;
     ctx.fillStyle = '#00ccff';
-    ctx.shadowColor = '#00ccff';
-    ctx.shadowBlur = 0;
     ctx.fillRect(0, -l.width, l.length, l.width * 0.01);
 
     // 2. PNG 광선
     ctx.globalAlpha = 0.55;
-    ctx.shadowBlur = 18;
 
     if (laserBeamImg.complete && laserBeamImg.naturalWidth > 0) {
         ctx.drawImage(
@@ -2277,14 +2681,13 @@ function render() {
 
     // 3. 중심의 흰색 광선
     ctx.globalAlpha = 0.9;
-    ctx.shadowColor = '#ffffff';
-    ctx.shadowBlur = 5;
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, -2, l.length, 4);
 
     ctx.restore();
 });
 
+    drawPlasma();
     laserEdgeEffects.forEach(hit => {
     if (!laserHitImg.complete || laserHitImg.naturalWidth === 0) {
         return;
@@ -2324,7 +2727,11 @@ function render() {
         const spriteSize = e.isBoss ? BOSS_SPRITE_SIZE : ENEMY_SPRITE_SIZE;
         const imageReady = img && img.loaded && !img.failed && img.naturalWidth > 0;
 
-        if (imageReady) {
+        if (imageReady && !e.isBoss && OUTLINE_MONSTERS.includes(spriteKey)) {
+            const o = getOutlinedSprite(spriteKey, img);
+            const T = spriteSize + OUTLINE_WIDTH * 2;
+            ctx.drawImage(o, e.x - T / 2, e.y - T / 2, T, T);
+        } else if (imageReady) {
             ctx.drawImage(img, e.x - spriteSize / 2, e.y - spriteSize / 2, spriteSize, spriteSize);
         } else {
             // PNG가 없거나 아직 로딩 중이거나 로딩에 실패하면 기존 원형으로 표시합니다.
@@ -2365,12 +2772,14 @@ function render() {
 
     drawHelper();          // 👼 아군 천사
     drawPoisons();         // ☠️ 독 구름
+    drawFreezeEffects();   // ❄️ 빙결 파동 / 얼음 상태
     renderVisualEffects(); // 💥 폭발 애니메이션 및 연쇄전격 렌더링
     renderParticles();
     renderFloatingTexts();
 
     ctx.restore();
 
+    drawItemArrows();     // 화면 밖 아이템 화살표 (화면 좌표)
     renderHUD();
 }
 
@@ -2389,7 +2798,6 @@ function drawProjectile(p) {
         if (PROJECTILE_ROTATE) ctx.rotate(Math.atan2(p.vy, p.vx));
         ctx.imageSmoothingEnabled = SPRITE_SMOOTHING;
         if (SPRITE_SMOOTHING) ctx.imageSmoothingQuality = 'high';
-        if (p.crit) { ctx.shadowColor = '#ffd84a'; ctx.shadowBlur = 14; }   // 치명타는 금색 빛
         ctx.drawImage(img, -w / 2, -h / 2, w, h);
         ctx.restore();
     } else {
@@ -2398,6 +2806,85 @@ function drawProjectile(p) {
         ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
         ctx.fill();
     }
+}
+
+// 흰색 테두리가 씌워진 몬스터 이미지 (처음 한 번만 만들고 재사용)
+const outlineCache = {};
+function getOutlinedSprite(key, img) {
+    if (outlineCache[key]) return outlineCache[key];
+    const S = ENEMY_SPRITE_SIZE, p = OUTLINE_WIDTH, T = S + p * 2;
+    // 1) 몬스터 모양을 흰색 실루엣으로 바꿈
+    const sil = document.createElement('canvas');
+    sil.width = S; sil.height = S;
+    const sc = sil.getContext('2d');
+    sc.drawImage(img, 0, 0, S, S);
+    sc.globalCompositeOperation = 'source-in';
+    sc.fillStyle = '#ffffff';
+    sc.fillRect(0, 0, S, S);
+    // 2) 실루엣을 사방 16방향으로 조금씩 밀어서 그려 테두리를 만듦
+    const out = document.createElement('canvas');
+    out.width = T; out.height = T;
+    const oc = out.getContext('2d');
+    for (let i = 0; i < 16; i++) {
+        const a = (i / 16) * Math.PI * 2;
+        oc.drawImage(sil, p + Math.cos(a) * p, p + Math.sin(a) * p, S, S);
+    }
+    // 3) 원래 몬스터 이미지를 가운데에 덮어 그림
+    oc.drawImage(img, p, p, S, S);
+    outlineCache[key] = out;
+    return out;
+}
+
+// 화면 밖 아이템 화살표: 가까운 순서로 최대 ARROW_MAX개. 반환값은 화면 좌표
+function getItemArrows() {
+    const W = canvas.width, H = canvas.height, pad = 34;
+    const cx = W / 2, cy = H / 2;
+    const off = items
+        .map(it => ({ it, d: Math.hypot(it.x - player.x, it.y - player.y) }))
+        .filter(o => {
+            const sx = o.it.x - camera.x, sy = o.it.y - camera.y;
+            return sx < 0 || sx > W || sy < 0 || sy > H;     // 화면 밖에 있는 것만
+        })
+        .sort((a, b) => a.d - b.d)
+        .slice(0, ARROW_MAX);
+
+    return off.map(({ it }) => {
+        const sx = it.x - camera.x, sy = it.y - camera.y;
+        const ang = Math.atan2(sy - cy, sx - cx);
+        const dx = Math.cos(ang), dy = Math.sin(ang);
+        // 화면 가장자리 안쪽(pad)과 만나는 지점 계산
+        const tx = dx !== 0 ? ((dx > 0 ? W - pad : pad) - cx) / dx : Infinity;
+        const ty = dy !== 0 ? ((dy > 0 ? H - pad : pad) - cy) / dy : Infinity;
+        const t = Math.min(tx, ty);
+        return { ax: cx + dx * t, ay: cy + dy * t, ang, type: it.type };
+    });
+}
+
+function drawItemArrows() {
+    const arrows = getItemArrows();
+    if (arrows.length === 0) return;
+    const colors = { heart: '#2ecc71', magnet: '#ffd84a', shield: '#00ccff' };
+    const icons = { heart: '💚', magnet: '🧲', shield: '🛡️' };
+    ctx.save();
+    for (const a of arrows) {
+        const color = colors[a.type] || '#fff';
+        ctx.save();
+        ctx.translate(a.ax, a.ay);
+        ctx.rotate(a.ang);
+        ctx.fillStyle = color;
+        ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(12, 0); ctx.lineTo(-7, -9); ctx.lineTo(-7, 9); ctx.closePath();
+        ctx.fill(); ctx.stroke();
+        ctx.restore();
+        // 아이콘은 화살표 안쪽에 표시
+        ctx.font = `${Math.round(16 * UI_SCALE)}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(icons[a.type] || '❔', a.ax - Math.cos(a.ang) * 26, a.ay - Math.sin(a.ang) * 26);
+    }
+    ctx.restore();
 }
 
 function drawPlayerSprite() {
@@ -2531,21 +3018,20 @@ function renderStatsPanel() {
 
     const maxTag = (lv, max) => (lv >= max ? ' MAX' : '');
     const skillLines = [];
-    if (player.laserLevel > 0)   skillLines.push(`⚡ 레이저 Lv.${player.laserLevel}${maxTag(player.laserLevel, 13)}`);
+    if (player.laserLevel > 0)   skillLines.push(`⚡ 레이저 Lv.${player.laserLevel}${maxTag(player.laserLevel, 10)}`);
     if (player.bombLevel > 0)    skillLines.push(`💣 폭탄 Lv.${player.bombLevel}${maxTag(player.bombLevel, 10)}`);
     if (player.chainLevel > 0)   skillLines.push(`🌩️ 연쇄 전격 Lv.${player.chainLevel}${maxTag(player.chainLevel, 13)}`);
     if (player.tornadoLevel > 0) skillLines.push(`🌪️ 회오리 Lv.${player.tornadoLevel}${maxTag(player.tornadoLevel, 10)}`);
     if (player.helperLevel > 0)  skillLines.push(`👼 도와줘! Lv.${player.helperLevel}${maxTag(player.helperLevel, 5)}`);
     if (player.poisonLevel > 0)  skillLines.push(`☠️ 독 Lv.${player.poisonLevel}${maxTag(player.poisonLevel, 7)}`);
+    if (player.freezeLevel > 0)  skillLines.push(`❄️ 빙결 Lv.${player.freezeLevel}${maxTag(player.freezeLevel, 7)}`);
     if (skillLines.length) { lines.push('— 스킬 —'); lines.push(...skillLines); }
 
     ctx.save();
-    ctx.font = '12px Arial';
+    ctx.font = `${Math.round(12 * UI_SCALE)}px Arial`;
     ctx.textAlign = 'right';
     ctx.fillStyle = '#fff';
-    ctx.shadowColor = 'rgba(0,0,0,0.9)';
-    ctx.shadowBlur = 3;
-    lines.forEach((t, i) => ctx.fillText(t, canvas.width - 14, 56 + i * 16));
+    lines.forEach((t, i) => ctx.fillText(t, canvas.width - 14, 56 + i * Math.round(16 * UI_SCALE)));
     ctx.restore();
 }
 
@@ -2700,6 +3186,7 @@ function calcRunReward() {
 function endRun() {
     gameState = 'GAMEOVER';
     document.getElementById('stats-toggle').classList.add('hidden');
+    document.getElementById('menu-btn').classList.add('hidden');
     document.getElementById('end-run-btn').classList.add('hidden');
 
     const s = getRunStats();
@@ -2806,18 +3293,50 @@ function fitGame() {
     const vv = window.visualViewport;
     const w = vv ? vv.width : window.innerWidth;
     const h = vv ? vv.height : window.innerHeight;
-    const s = Math.min(w / GAME_BOX_W, h / GAME_BOX_H, MAX_SCALE);
-    document.getElementById('game-container').style.transform = `translate(-50%, -50%) scale(${s})`;
+    const container = document.getElementById('game-container');
+
+    if (IS_TOUCH_DEVICE) {
+        // 모바일: 게임이 기기 화면 전체를 채움. 세로 범위는 TOUCH_VIEW_H로 고정하고 가로는 화면 비율에 맞춤
+        const viewH = TOUCH_VIEW_H;
+        const viewW = Math.max(320, Math.round(viewH * (w / h)));
+        container.classList.add('touch-fill');
+        container.style.transform = 'none';
+        if (canvas.width !== viewW || canvas.height !== viewH) {
+            canvas.width = viewW;
+            canvas.height = viewH;
+            ctx.imageSmoothingEnabled = false;
+        }
+    } else {
+        // PC: 기존처럼 800x600 게임 화면을 창 크기에 맞춰 가운데에 확대/축소
+        const s = Math.min(w / GAME_BOX_W, h / GAME_BOX_H, MAX_SCALE);
+        container.classList.remove('touch-fill');
+        container.style.transform = `translate(-50%, -50%) scale(${s})`;
+        if (canvas.width !== 800 || canvas.height !== 600) {
+            canvas.width = 800;
+            canvas.height = 600;
+            ctx.imageSmoothingEnabled = false;
+        }
+    }
 }
 window.addEventListener('resize', fitGame);
 window.addEventListener('orientationchange', () => setTimeout(fitGame, 200));
 if (window.visualViewport) window.visualViewport.addEventListener('resize', fitGame);
+['fullscreenchange', 'webkitfullscreenchange'].forEach(ev =>
+    document.addEventListener(ev, () => { refreshFsButton(); setTimeout(fitGame, 150); }));
 
 function isPortraitBlocked() {
     return window.matchMedia && window.matchMedia('(pointer: coarse) and (orientation: portrait)').matches;
 }
 
 const IS_TOUCH_DEVICE = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+
+// ===== 모바일 화면 설정 =====
+const TOUCH_VIEW_H = 430;        // 모바일에서 세로로 보이는 게임 범위(값이 작을수록 캐릭터/몬스터가 크게 보임)
+const UI_SCALE = IS_TOUCH_DEVICE ? 1.3 : 1;   // 모바일에서 정보 패널 글씨 배율
+const ITEM_SCALE = IS_TOUCH_DEVICE ? 1.6 : 1; // 모바일에서 필드 아이템 크기 배율
+const ARROW_MAX = 4;             // 화면 밖 아이템 화살표 최대 개수
+const OUTLINE_MONSTERS = ['Violet'];  // 하얀 테두리를 씌울 몬스터 이름 목록
+const OUTLINE_WIDTH = 3;              // 테두리 두께(px)
 
 // 화면을 터치한 곳에 조이스틱이 생기고, 드래그한 방향으로 이동합니다.
 const joystick = { active: false, id: null, baseX: 0, baseY: 0, knobX: 0, knobY: 0, dx: 0, dy: 0, moving: false };
@@ -2847,7 +3366,13 @@ function updateJoystick(p) {
     joystick.knobY = joystick.baseY + (dist > 0 ? (vy / dist) * k : 0);
 }
 
-canvas.addEventListener('touchstart', e => {
+// 조이스틱: 게임 화면 어디든 터치하면 그 자리가 조이스틱 중심이 됨 (버튼, 창, 메뉴 제외)
+function isUiTarget(el) {
+    return !!(el && el.closest && el.closest('button, .modal:not(.hidden), #rotate-hint'));
+}
+
+window.addEventListener('touchstart', e => {
+    if (gameState !== 'PLAYING' || isUiTarget(e.target)) return;
     e.preventDefault();
     if (joystick.active) return;
     const t = e.changedTouches[0];
@@ -2860,7 +3385,8 @@ canvas.addEventListener('touchstart', e => {
     joystick.moving = false;
 }, { passive: false });
 
-canvas.addEventListener('touchmove', e => {
+window.addEventListener('touchmove', e => {
+    if (!joystick.active) return;
     e.preventDefault();
     for (const t of e.changedTouches) {
         if (t.identifier === joystick.id) updateJoystick(touchToCanvas(t));
@@ -2872,8 +3398,8 @@ function endTouch(e) {
         if (t.identifier === joystick.id) resetJoystick();
     }
 }
-canvas.addEventListener('touchend', endTouch);
-canvas.addEventListener('touchcancel', endTouch);
+window.addEventListener('touchend', endTouch);
+window.addEventListener('touchcancel', endTouch);
 
 // iOS 사파리 핀치 줌 방지
 ['gesturestart', 'gesturechange', 'gestureend'].forEach(ev =>
@@ -2887,8 +3413,6 @@ function renderTouchUI() {
         ctx.textAlign = 'center';
         ctx.fillStyle = '#fff';
         ctx.globalAlpha = Math.max(0, Math.min(1, (8 - gameTime) / 2));
-        ctx.shadowColor = 'rgba(0,0,0,0.9)';
-        ctx.shadowBlur = 3;
         ctx.fillText('화면을 터치한 채로 드래그하면 이동해요', canvas.width / 2, canvas.height - 28);
         ctx.restore();
     }
@@ -2992,7 +3516,34 @@ function startPreload() {
     });
 }
 
+// ===== 전체화면 (안드로이드 크롬 등 지원 기기) =====
+// 아이폰 사파리는 웹페이지 전체화면을 지원하지 않아서, 버튼 대신 '홈 화면에 추가' 후 실행하면 주소창 없이 열립니다.
+function fullscreenSupported() {
+    const el = document.documentElement;
+    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    return !isIOS && !!(el.requestFullscreen || el.webkitRequestFullscreen);
+}
+function isFullscreenNow() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+}
+function toggleFullscreen() {
+    const el = document.documentElement;
+    if (!isFullscreenNow()) {
+        const req = el.requestFullscreen || el.webkitRequestFullscreen;
+        try { const p = req.call(el); if (p && p.catch) p.catch(() => {}); } catch (e) {}
+        try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {}); } catch (e) {}
+    } else {
+        const ex = document.exitFullscreen || document.webkitExitFullscreen;
+        if (ex) ex.call(document);
+    }
+}
+function refreshFsButton() {
+    const b = document.getElementById('fs-toggle');
+    if (b) b.textContent = isFullscreenNow() ? '🗗' : '⛶';
+}
+
 // 초기 화면 구성
+if (IS_TOUCH_DEVICE && fullscreenSupported()) document.getElementById('fs-toggle').classList.remove('hidden');
 fitGame();
 buildCharacterGrid();
 refreshCoinLabels();
