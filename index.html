@@ -122,16 +122,20 @@
         }
         .card-container {
             display: flex;
-            gap: 15px;
-            margin-top: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: clamp(6px, 1.5vw, 15px);
+            margin-top: clamp(8px, 2vh, 20px);
+            max-width: 96%;
         }
         .card {
-            width: 180px;
-            height: 230px;
+            width: clamp(96px, 19vw, 180px);
+            height: clamp(130px, 52vh, 230px);
+            box-sizing: border-box;
             background: linear-gradient(145deg, #1c1c36, #28284e);
             border: 2px solid #484880;
             border-radius: 12px;
-            padding: 15px;
+            padding: clamp(6px, 1.6vh, 15px);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -146,20 +150,24 @@
             box-shadow: 0 10px 22px rgba(0, 255, 204, 0.4);
         }
         .card-icon {
-            font-size: 40px;
-            margin-bottom: 12px;
+            font-size: clamp(26px, 6vh, 40px);
+            margin-bottom: clamp(4px, 1.2vh, 12px);
         }
         .card-title {
-            font-size: 16px;
+            font-size: clamp(13px, 2.8vh, 16px);
             font-weight: bold;
             color: #00ffcc;
-            margin-bottom: 8px;
+            margin-bottom: clamp(3px, 1vh, 8px);
         }
         .card-desc {
-            font-size: 12px;
+            font-size: clamp(10px, 2.1vh, 12px);
             color: #ccc;
-            line-height: 1.4;
+            line-height: 1.35;
+            overflow: hidden;
         }
+        #levelup-modal { padding: 10px; box-sizing: border-box; overflow-y: auto; }
+        #levelup-modal h2 { font-size: clamp(20px, 5vh, 30px) !important; margin: 0; }
+        #levelup-modal p { margin: 4px 0 0 !important; font-size: clamp(12px, 2.4vh, 14px); }
         .btn {
             background: linear-gradient(180deg, #ff0055, #a30036);
             color: white;
@@ -258,6 +266,7 @@
         .char-select-card .character-name { font-weight: bold; color: #00ffcc; font-size: 17px; }
         .char-select-card .character-ability { font-size: 11px; color: #ffe600; margin-top: 6px; line-height: 1.35; }
         .char-select-card .character-drawback { font-size: 10px; color: #aaa; margin-top: 4px; line-height: 1.3; }
+        .char-select-card.locked { opacity: 0.5; cursor: not-allowed; }
         @media (max-height: 520px) {
             #character-select-modal { justify-content: flex-start; }
             #character-select-modal h2 { margin: 0 0 4px !important; }
@@ -379,12 +388,6 @@
             border-radius: 50%; width: 38px; height: 38px; font-size: 18px; cursor: pointer; padding: 0;
         }
         #fs-toggle:hover { background: rgba(255,255,255,0.18); }
-        @media (pointer: coarse) {
-            .card { width: 210px; height: 260px; }
-            .card-icon { font-size: 46px; }
-            .card-title { font-size: 19px; }
-            .card-desc { font-size: 14px; }
-        }
 
         /* ===== v27: 메뉴 버튼 ===== */
         #menu-btn {
@@ -393,6 +396,24 @@
             border-radius: 6px; padding: 4px 10px; font-size: 13px; cursor: pointer;
         }
         #menu-btn:hover { background: rgba(255,255,255,0.18); }
+
+        /* ===== v38: 펫 스킬 버튼 ===== */
+        #pet-skill-btn {
+            position: absolute; bottom: 14px; left: 106px; z-index: 15;
+            background: rgba(0,0,0,0.45); color: #fff; border: 1px solid rgba(255,255,255,0.35);
+            border-radius: 19px; height: 38px; min-width: 38px; padding: 0 10px; font-size: 15px; cursor: pointer;
+        }
+        #pet-skill-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+        #pet-skill-btn:not(:disabled):hover { background: rgba(255,255,255,0.18); }
+
+        /* ===== v39: 포탑 버튼 ===== */
+        #turret-btn {
+            position: absolute; bottom: 14px; left: 152px; z-index: 15;
+            background: rgba(0,0,0,0.45); color: #fff; border: 1px solid rgba(255,255,255,0.35);
+            border-radius: 19px; height: 38px; min-width: 38px; padding: 0 10px; font-size: 15px; cursor: pointer;
+        }
+        #turret-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+        #turret-btn:not(:disabled):hover { background: rgba(255,255,255,0.18); }
     </style>
 </head>
 <body>
@@ -410,6 +431,8 @@
     <button id="menu-btn" class="hidden" onclick="openMenu(); this.blur();">⚙️ 메뉴</button>
     <button id="fs-toggle" class="hidden" onclick="toggleFullscreen(); this.blur();">⛶</button>
     <button id="sound-toggle" onclick="SFX.toggleMute(); this.blur();">🔊</button>
+    <button id="turret-btn" class="hidden" onclick="placeTurret(); this.blur();">🗼</button>
+    <button id="pet-skill-btn" class="hidden" onclick="usePetSkill(); this.blur();">📱</button>
     <button id="end-run-btn" class="hidden" onclick="finishRun(); this.blur();">🏁 게임 종료</button>
 
     <!-- Loading Screen: 이미지/폰트를 모두 받을 때까지 표시 -->
@@ -425,8 +448,8 @@
         <p style="color: #aaa; margin-bottom: 30px;">원하는 캐릭터를 골라 마물을 퇴치하세요!</p>
         <div class="coin-label">🪙 보유 코인: <span class="coin-count">0</span></div>
         <div class="btn-row">
-            <button class="btn" onclick="openCharacterSelect()">게임 시작</button>
-            <button class="btn btn-sub" onclick="openShop('start')">🛠️ 영구 강화 상점</button>
+            <button class="btn" onclick="openMapSelect()">게임 시작</button>
+            <button class="btn btn-sub" onclick="openShop('start')">🏋️ 개인 훈련</button>
         </div>
     </div>
 
@@ -451,7 +474,7 @@
         <div id="reward-box"></div>
         <div class="btn-row">
             <button class="btn" onclick="restartGame()">다시 도전</button>
-            <button class="btn btn-sub" onclick="openShop('gameover')">🛠️ 영구 강화</button>
+            <button class="btn btn-sub" onclick="openShop('gameover')">🏋️ 개인 훈련</button>
             <button class="btn btn-sub" onclick="backToCharacterSelect()">캐릭터 변경</button>
         </div>
     </div>
@@ -476,11 +499,29 @@
         </div>
     </div>
 
+    <!-- Map Select Modal (맵 선택) -->
+    <div id="map-modal" class="modal hidden">
+        <h2 style="color: #00ffcc; font-size: 32px; margin-bottom: 8px; text-shadow: 0 0 12px #00ffcc;">맵 선택</h2>
+        <p style="color: #ccc; margin-bottom: 22px;">플레이할 맵을 선택해주세요</p>
+        <div class="btn-row" style="flex-direction: column; align-items: center;">
+            <button class="btn" style="min-width: 260px;" onclick="openCharacterSelect('base')">🏯 황궁 던전</button>
+            <button class="btn btn-sub" id="city-btn" style="min-width: 260px;" onclick="openCharacterSelect('city')">🏙️ 대도시</button>
+            <button class="btn btn-sub" style="min-width: 260px;" onclick="closeMapSelect()">돌아가기</button>
+        </div>
+    </div>
+
     <!-- Shop Modal -->
     <div id="shop-modal" class="modal hidden">
-        <h2 style="color: #ffd84a; font-size: 28px; margin: 4px 0; text-shadow: 0 0 12px #ffd84a;">🛠️ 영구 강화 상점</h2>
+        <h2 style="color: #ffd84a; font-size: 28px; margin: 4px 0; text-shadow: 0 0 12px #ffd84a;">🏋️ 개인 훈련</h2>
         <div class="coin-label" style="margin-bottom: 4px;">🪙 보유 코인: <span class="coin-count">0</span></div>
+        <div class="btn-row" style="margin: 2px 0 6px;">
+            <button class="btn btn-sub" id="tab-stats" onclick="setTrainTab('stats')">⚒️ 강화</button>
+            <button class="btn btn-sub" id="tab-char" onclick="setTrainTab('char')">👤 캐릭터</button>
+            <button class="btn btn-sub" id="tab-pet" onclick="setTrainTab('pet')">🐾 펫</button>
+            <button class="btn btn-sub" id="tab-info" onclick="setTrainTab('info')">📋 내 정보</button>
+        </div>
         <div class="shop-grid" id="shop-grid"></div>
+        <p id="train-note" class="hidden" style="color:#aaa; margin: 14px 0; font-size: 15px;"></p>
         <div class="btn-row" style="margin-top: 10px;">
             <button class="btn btn-sub" onclick="closeShop()">돌아가기</button>
             <button class="btn btn-sub" style="background:#552233;" onclick="resetSaveData()">데이터 초기화</button>
@@ -515,6 +556,64 @@ const BG_FILES = [
     'images/backg_7.png'
 ];
 const bgImages = BG_FILES.map(src => { const img = new Image(); img.src = src; return img; });
+
+// ===== 대도시 맵 =====
+const CITY_BG_FILES = [
+    'images/backg_citya.png',     // 1~10레벨 (첫 배경)
+    'images/backg_city1.png',
+    'images/backg_city2.png',
+    'images/backg_city3.png',
+    'images/backg_city4.png',
+    'images/backg_city5.png'
+];
+const cityBgImages = CITY_BG_FILES.map(src => { const img = new Image(); img.src = src; return img; });
+let currentWorld = 'base';     // 'base'(황궁 던전) 또는 'city'(대도시)
+function activeBgImages() { return currentWorld === 'city' ? cityBgImages : bgImages; }
+
+// 대도시 배경 번호별로 나오는 몬스터 (배경1: City1,2 / 배경2: City3,4 / 배경3: City5,6 / 배경4: City7,8 / 배경5: City9)
+// 배경 번호 순서: 0 = 시작(1~10레벨), 1~4 = 시티보스 10/20/30/45 등장 시, 5 = 대도시 클리어 후
+const CITY_STAGE_MONSTERS = [
+    ['CityA', 'CityB'],
+    ['City1', 'City2'],
+    ['City3', 'City4'],
+    ['City5', 'City6'],
+    ['City7', 'City8'],
+    ['City9']
+];
+
+// ===== 대도시 보스 (10·20·30·45레벨) =====
+const CITY_BOSS_LEVELS = [10, 20, 30, 45];
+const CITY_BOSS_STAGE = { 10: 1, 20: 2, 30: 3, 45: 4 };      // 보스 등장 시 바뀌는 배경 번호
+const CITY_BOSS_NAMES = { 10: '단소 살인마', 20: '취해버린 부장 좀비', 30: '유혹의 가챠 기계', 45: '동네 유치원생' };
+const CITY_BOSS_STATS = {
+    // minHp/seconds: 체력 = max(minHp, seconds × 플레이어 기본공격 초당 화력)
+    10: { minHp: 15000, seconds: 50, speed: 0.60, contact: 30, bullets: 10, interval: 2.4, bulletDmg: 14, bulletSpeed: 3.0, sprite: 'CityBoss10' },
+    20: { minHp: 25000, seconds: 60, speed: 0.65, contact: 35, bullets: 10, interval: 1.4, bulletDmg: 18, bulletSpeed: 4.0, sprite: 'CityBoss20' },
+    30: { minHp: 30000, seconds: 65, speed: 0.50, contact: 35, bullets: 0,  interval: 0,   bulletDmg: 0,  bulletSpeed: 0,   sprite: 'CityBoss30' },
+    45: { minHp: 80000, seconds: 100, speed: 0.45, contact: 50, bullets: 0, interval: 0, bulletDmg: 0, bulletSpeed: 0, sprite: 'CityBoss45' }
+};
+const CITY_CLEAR_BOSS_COUNT = 4;   // 시티보스 4마리를 모두 처치하면 클리어
+let cityBossKills = 0;
+const CITY_EXP_START = 1000;       // 대도시 첫 레벨업 필요 경험치 (이후는 기존 곡선)
+
+// 가챠기계 룰렛 (확률 합 100)
+const ROULETTE_ITEMS = [
+    { label: '체력 -10',     weight: 20, kind: 'hp',  value: 10 },
+    { label: '공격속도 -5%', weight: 20, kind: 'asr' },
+    { label: '이동속도 -5%', weight: 20, kind: 'spd' },
+    { label: '체력 -20',     weight: 15, kind: 'hp',  value: 20 },
+    { label: '공격력 -10',   weight: 15, kind: 'ap' },
+    { label: '체력 -30',     weight: 10, kind: 'hp',  value: 30 }
+];
+const GACHA_INTERVAL = 15;         // 룰렛 주기(초)
+let gachaTimer = 0;
+let roulette = null;               // {phase:'spin'|'result', t, stepT, idx, result}
+
+// 유치원생 스폰
+const TOY_SPAWN_INTERVAL = 20;     // 스폰 주기(초)
+const TOY_SPAWN_COUNT = 20;        // 주기마다 종류별 개수 (성 20 + 요요 20)
+const TOY_CAP = 100;               // 동시에 살아 있는 장난감 몬스터 상한
+let toyTimer = 0;
 
 // 배경 한 장(타일)을 게임 속에서 그릴 크기(px). 이미지 원본은 1254x1254 입니다.
 // 숫자가 클수록 배경이 크게 보이고(화면에 일부만 보임), 작을수록 작게 보이며 더 자주 반복됩니다.
@@ -576,6 +675,13 @@ expGemImg3.src = 'images/exp_3.png';
 const expGemImg4 = new Image();
 expGemImg4.src = 'images/exp_4.png';
 
+const expGemImg5 = new Image();   // 경험치 600 이상
+expGemImg5.src = 'images/exp_5.png';
+const expGemImg6 = new Image();   // 경험치 1000 이상
+expGemImg6.src = 'images/exp_6.png';
+const expGemImg7 = new Image();   // 경험치 2000 이상
+expGemImg7.src = 'images/exp_7.png';
+
 // 적 PNG 설정: 파일은 HTML 파일과 같은 위치의 images 폴더에 둡니다.
 // 파일명이 아직 정해지지 않은 항목은 null로 두어 기존 원형 표시를 사용합니다.
 const ENEMY_SPRITE_SIZE = 48;
@@ -592,11 +698,26 @@ const ENEMY_IMAGE_FILES = {
     "Ice-cream": "monster9.png",
     Pudding: "monster10.png",
     Violet: "monster11.png",
+    CityA: "city_monstera.png",
+    CityB: "city_monsterb.png",
+    City1: "city_monster1.png",
+    City2: "city_monster2.png",
+    City3: "city_monster3.png",
+    City4: "city_monster4.png",
+    City5: "city_monster5.png",
+    City6: "city_monster6.png",
+    City7: "city_monster7.png",
+    City8: "city_monster8.png",
+    City9: "city_monster9.png",
     Boss10: "boss10.png",
     Boss20: "boss20.png",
     Boss30: "boss30.png",
     Boss40: "boss40.png",
     Boss60: "boss60.png",
+    CityBoss10: "city_boss1.png",
+    CityBoss20: "city_boss2.png",
+    CityBoss30: "city_boss3.png",
+    CityBoss45: "city_boss4.png",
 };
 
 const ENEMY_IMAGES = {};
@@ -780,7 +901,7 @@ let player = {
     x: 0, y: 0, radius: 12, hp: 100, maxHp: 100, speed: 3.2,
     level: 1, exp: 0, maxExp: 8, invincibleTimer: 0, facingAngle: 0, magnetRange: 100,
     attackPower: 25, attackSpeedRatio: 1.0, bulletCount: 1, pierceCount: 1,
-    hasSplash: false, splashRadiusMult: 1, critChance: 0, critDamage: 0, flatpowerLevel: 0, helperLevel: 0, helperTimer: 0, poisonLevel: 0, poisonTimer: 0, freezeLevel: 0, freezeTimer: 0, expMult: 1, damageTakenMult: 1, revivesLeft: 0, cardChoices: 3,
+    hasSplash: false, splashRadiusMult: 1, critChance: 0, critDamage: 0, flatpowerLevel: 0, helperLevel: 0, helperTimer: 0, poisonLevel: 0, poisonTimer: 0, freezeLevel: 0, freezeTimer: 0, turretLevel: 0, turretCd: 0, boomerangLevel: 0, boomerangTimer: 0, expMult: 1, damageTakenMult: 1, revivesLeft: 0, cardChoices: 3,
     laserLevel: 0, laserCooldown: 0,
     chainLevel: 0, bombLevel: 0, bombTimer: 0,
     tornadoLevel: 0, tornadoAngle: 0
@@ -809,7 +930,19 @@ const RAINBOW_TIERS = [
   { name: 'Bingsu', color: '#8e44ad', hp: 800, speedMult: 0.75, radius: 14, exp: 80 }, { name: 'Choco', color: '#8e44ad', hp: 800, speedMult: 0.73, radius: 14, exp: 120 },
 { name: 'Ice-cream', color: '#8e44ad', hp: 1200, speedMult: 0.70, radius: 15, exp: 150 },
 { name: 'Pudding', color: '#8e44ad', hp: 1700, speedMult: 0.75, radius: 15, exp: 200 },
-    { name: 'Violet', color: '#e056fd', hp: 2700, speedMult: 0.80, radius: 16, exp: 300 }
+    { name: 'Violet', color: '#e056fd', hp: 2700, speedMult: 0.80, radius: 16, exp: 400 },
+    // ===== 대도시 몬스터 (city_monster1~9) : 체력 = 몬스터5(Blue 340)×1.3 = 442 부터 15%씩 증가, 경험치 600부터 15%씩 증가 =====
+    { name: 'CityA', color: '#ffa6cc', hp: 442,  speedMult: 0.63, radius: 14, exp: 600 },
+    { name: 'CityB', color: '#ffa6cc', hp: 508,  speedMult: 0.648, radius: 14, exp: 690 },
+    { name: 'City1', color: '#ff7ab6', hp: 585,  speedMult: 0.675, radius: 14, exp: 794 },
+    { name: 'City2', color: '#ff7ab6', hp: 672,  speedMult: 0.675, radius: 14, exp: 913 },
+    { name: 'City3', color: '#ff7ab6', hp: 773,  speedMult: 0.675, radius: 14, exp: 1300 },
+    { name: 'City4', color: '#ff7ab6', hp: 889,  speedMult: 0.675, radius: 14, exp: 1495 },
+    { name: 'City5', color: '#ff7ab6', hp: 1022,  speedMult: 0.675, radius: 14, exp: 1719 },
+    { name: 'City6', color: '#ff7ab6', hp: 1176,  speedMult: 0.675, radius: 14, exp: 1977 },
+    { name: 'City7', color: '#ff7ab6', hp: 1352, speedMult: 0.675, radius: 14, exp: 2274 },
+    { name: 'City8', color: '#ff7ab6', hp: 1555, speedMult: 0.675, radius: 14, exp: 2615 },
+    { name: 'City9', color: '#ff7ab6', hp: 1788, speedMult: 0.675, radius: 14, exp: 3007 }
 ];
 
 // =====================================================================
@@ -845,7 +978,7 @@ const BOSS_LEVELS = [10, 20, 30, 40, 60];
 const BOSS_APPEAR_STAGE = { 10: 1, 20: 2, 30: 3, 40: 4 };
 
 // 스킬 최대 레벨 (여기에 없는 스킬은 제한 없음)
-const SKILL_MAX_LEVEL = { laser: 10, bomb: 10, chain: 13, tornado: 10, flatpower: 5, helper: 5, poison: 7, freeze: 7 };
+const SKILL_MAX_LEVEL = { laser: 10, bomb: 10, chain: 13, tornado: 10, flatpower: 5, helper: 5, poison: 7, freeze: 7, turret: 5, boomerang: 5 };
 
 // ===== '도와줘!' 스킬 설정 (아군 천사) =====
 const HELPER_BASE_INTERVAL = 15;    // Lv.1 등장 주기(초): 이 시간마다 한 번 나타남
@@ -900,7 +1033,7 @@ function updatePlasma(dt) {
     if (!isPlasmaMode()) return;
     plasmaAngle += dt * PLASMA_SPIN;
     const blades = getPlasmaBlades();
-    const dmgPerSec = player.attackPower * PLASMA_DMG_PER_SEC;
+    const dmgPerSec = player.attackPower * PLASMA_DMG_PER_SEC * (player.areaMult || 1);
 
     for (const e of enemies) {
         const r = e.isBoss ? 28 : e.tier.radius;
@@ -1021,6 +1154,8 @@ const SKILLS = [
     { id: 'helper', title: '도와줘!', icon: '👼', desc: '아군 천사가 나타나 내 공격 능력 그대로 적을 공격하고 사라집니다. (15초마다 3초간 / 레벨당 주기 -1초, 활동 +1초 / 최대 Lv.5)' },
     { id: 'poison', title: '독', icon: '☠️', desc: '화면 안 랜덤한 곳에 독 구름을 설치합니다. 닿은 적이 지속 피해를 받습니다. (6초마다 설치 / 레벨마다 피해·지속시간·개수 증가 / 최대 Lv.7)' },
     { id: 'freeze', title: '빙결', icon: '❄️', desc: '내 발밑에서 얼음 파동이 퍼져 닿은 몬스터를 2초간 얼립니다. (레벨당 범위 +25px, 주기 -0.4초, 보스 제외 / 최대 Lv.7)' },
+    { id: 'turret', title: '포탑 설치', icon: '🗼', desc: '80초마다 내 위치에 포탑을 설치합니다. 몬스터들이 포탑을 공격하며 몰려갑니다. 유지 5초(+3초/레벨) 또는 체력 100이 닳으면 사라짐. (최대 Lv.5)' },
+    { id: 'boomerang', title: '부메랑', icon: '🪃', desc: '공격력 0.9 피해. 가까운 적 방향으로 화면 가장자리까지 날아갔다가 나에게 돌아옵니다. 레벨마다 1개씩 추가. (최대 Lv.5)' },
     { id: 'flatpower', title: '공격력 +5', icon: '💪', desc: '공격력이 +5 증가합니다. (한 판에 최대 5번)' }
 ];
 
@@ -1060,7 +1195,20 @@ function showAnnouncement(text, duration = 2500, isCharacter = false) {
 }
 
 
-function openCharacterSelect() {
+function openMapSelect() {
+    document.getElementById('start-modal').classList.add('hidden');
+    updateCityButton();
+    document.getElementById('map-modal').classList.remove('hidden');
+}
+function closeMapSelect() {
+    document.getElementById('map-modal').classList.add('hidden');
+    document.getElementById('start-modal').classList.remove('hidden');
+}
+
+function openCharacterSelect(world = 'base') {
+    currentWorld = world;
+    buildCharacterGrid();
+    document.getElementById('map-modal').classList.add('hidden');
     document.getElementById('start-modal').classList.add('hidden');
     document.getElementById('character-select-modal').classList.remove('hidden');
 }
@@ -1086,8 +1234,8 @@ const CHARACTERS = {
     p3: {
         name: '법사', icon: '🧙🏻', image: 'images/player3.png', bulletImage: 'images/attack_3.png',
         attackMult: 0.95, attackSpeed: 1.0, moveMult: 1.15, pierce: 1,
-        splash: true, splashRadius: 1.30, crit: 0, startSkills: { chain: 1 }, cardChoices: 3,
-        ability: '✨ 광역 범위 +30% / 이동 +15% / 시작 스킬 🌩️ 번개', drawback: '공격력 5% 감소',
+        splash: false, splashRadius: 1.0, crit: 0, startSkills: { chain: 1 }, cardChoices: 3, areaMult: 1.3,
+        ability: '✨ 광역 스킬 피해 +30% (폭탄·회오리·빙결·레이저) / 이동 +15% / 시작 스킬 🌩️ 번개 Lv.1', drawback: '공격력 5% 감소',
         announce: '후.. 귀찮은 일이 생겼군요'
     },
     p4: {
@@ -1096,8 +1244,47 @@ const CHARACTERS = {
         splash: false, splashRadius: 1.0, crit: 0, startSkills: {}, extraBullets: 1, cardChoices: 4,
         ability: '🐟 공격력 +15% / 이동 +20% / 🏹 시작 투사체 +1 / 🍀 레벨업 카드 4장 중 선택', drawback: '시작 스킬 없음',
         announce: '잡아줄테니 걱정말라냥'
+    },
+    // ===== 코인 구매 캐릭터 (개인 훈련 > 캐릭터에서 구매) =====
+    p6: {
+        name: '어린이', icon: '🧒', image: 'images/player5.png', bulletImage: 'images/attack_5.png',
+        attackMult: 1.00, attackSpeed: 0.9, moveMult: 1.1, pierce: 1, hpBonus: 20,
+        splash: false, splashRadius: 1.0, crit: 0, startSkills: {}, cardChoices: 3,
+        ability: '🎈 호기심: 경험치 획득량 +15% / 이동 +10% / 최대 체력 +20', drawback: '공격 속도 -10%',
+        announce: '와! 같이 놀자!',
+        passive: 'curiosity', price: 1000
+    },
+    p7: {
+        name: '의사', icon: '🩺', image: 'images/player6.png', bulletImage: 'images/attack_6.png',
+        attackMult: 0.95, attackSpeed: 1.2, moveMult: 1.0, pierce: 1, critDmgBonus: 10,
+        splash: false, splashRadius: 1.0, crit: 0, startSkills: {}, cardChoices: 3,
+        ability: '🩹 응급처치: 몬스터 처치 시 1% 확률로 체력 3 회복 / 공격 속도 +20% / 치명타 피해 +10%', drawback: '공격력 -5%',
+        announce: '괜찮아요, 제가 치료해 드릴게요',
+        passive: 'doctor', price: 1500
+    },
+    p8: {
+        name: '강아지', icon: '🐶', image: 'images/player7.png', bulletImage: 'images/attack_7.png',
+        attackMult: 1.10, attackSpeed: 1.0, moveMult: 1.15, pierce: 1, hpBonus: -15, critDmgBonus: 20,
+        splash: false, splashRadius: 1.0, crit: 0, startSkills: {}, cardChoices: 3,
+        ability: '🦴 충성: 코인 획득량 +15% / 치명타 피해 +20% / 이동 +15%', drawback: '최대 체력 -15',
+        announce: '멍! 주인님, 힘내세요!',
+        passive: 'dog', price: 2500
+    },
+    p9: {
+        name: '토끼', icon: '🐰', image: 'images/player8.png', bulletImage: 'images/attack_8.png',
+        attackMult: 1.15, attackSpeed: 0.9, moveMult: 1.2, pierce: 1, crit: 0.05,
+        splash: false, splashRadius: 1.0, startSkills: {}, cardChoices: 5,
+        ability: '🥕 당근: 레벨업 카드 5장 중 선택 / 공격력 +15% / 이동 +20% / 치명타 확률 +5%', drawback: '공격 속도 -10%',
+        announce: '당근 먹고 힘내볼게요!',
+        passive: 'rabbit', price: 4000
     }
 };
+
+// 코인으로 구매한 캐릭터인지 확인 (기본 캐릭터 p1~p4는 항상 사용 가능)
+function isCharOwned(id) {
+    const c = CHARACTERS[id];
+    return !c.price || !!save.chars[id];
+}
 
 function buildCharacterGrid() {
     const grid = document.getElementById('char-grid');
@@ -1112,8 +1299,16 @@ function buildCharacterGrid() {
             <div class="character-name">${c.name}</div>
             <div class="character-ability">${c.ability}</div>
             <div class="character-drawback">${c.drawback}</div>`;
-        card.onclick = () => selectCharacter(id);
-        card.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectCharacter(id); } };
+        if (!isCharOwned(id)) {
+            card.classList.add('locked');
+            card.innerHTML = `
+                <div class="character-icon">🔒</div>
+                <div class="character-name">${c.name}</div>
+                <div class="character-ability">개인 훈련에서 🪙 ${c.price} 에 구매</div>`;
+        } else {
+            card.onclick = () => selectCharacter(id);
+            card.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectCharacter(id); } };
+        }
         grid.appendChild(card);
     });
 }
@@ -1130,15 +1325,30 @@ function applyCharacterStats(charType) {
     player.splashRadiusMult = c.splashRadius;
     player.critChance = c.crit;
     player.cardChoices = c.cardChoices;
+    player.maxHp += (c.hpBonus || 0);                 // 캐릭터별 최대 체력 보너스
+    player.hp = player.maxHp;
+    player.critDamage += (c.critDmgBonus || 0);      // 캐릭터별 치명타 피해 보너스 (% 단위)
+    player.areaMult = c.areaMult || 1;                // 광역 스킬 피해 배율 (법사)
     Object.entries(c.startSkills).forEach(([id, lv]) => { player[id + 'Level'] = lv; });
 
     applyMetaUpgrades();   // 영구 강화 반영 (캐릭터 기본값 위에 곱/합산)
+    player.passive = c.passive || null;
+    if (c.passive === 'curiosity') player.expMult *= 1.15;   // 어린이: 경험치 +15%
     showAnnouncement(CHARACTERS[charType].announce, 2500, true);
 }
 
 function startRun(charType) {
+    if (currentWorld === 'city' && !save.cityVisited) { save.cityVisited = true; persistSave(); }
     resetGame();
     applyCharacterStats(charType);
+    // 게임 시작 시점의 스탯 = 가챠 디버프로 더 이상 내려가지 않는 하한
+    player.floorAP = player.attackPower;
+    player.floorASR = player.attackSpeedRatio;
+    player.floorSPD = player.speed;
+    if (currentWorld === 'city') player.maxExp = CITY_EXP_START;
+    cityBossKills = 0; gachaTimer = 0; roulette = null; toyTimer = 0;
+    turret = null; boomerangs = [];
+    initPetRun();
     autoAttackTimer = 0;
     bossSpawnedForLevel = 0;
     lastTime = 0;
@@ -1150,6 +1360,7 @@ function startRun(charType) {
 }
 
 function selectCharacter(charType) {
+    if (!isCharOwned(charType)) return;
     selectedCharType = charType;
     if (charImages[charType]) {
         playerImg = charImages[charType];          // 로딩 화면에서 이미 받아둔 이미지
@@ -1201,7 +1412,7 @@ function resetGame() {
         x: 0, y: 0, radius: 12, hp: 100, maxHp: 100, speed: 3.2,
         level: 1, exp: 0, maxExp: 8, invincibleTimer: 0, facingAngle: 0, magnetRange: 100,
         attackPower: 25, attackSpeedRatio: 1.0, bulletCount: 1, pierceCount: 1,
-        hasSplash: false, splashRadiusMult: 1, critChance: 0, critDamage: 0, flatpowerLevel: 0, helperLevel: 0, helperTimer: 0, poisonLevel: 0, poisonTimer: 0, freezeLevel: 0, freezeTimer: 0, expMult: 1, damageTakenMult: 1, revivesLeft: 0, cardChoices: 3,
+        hasSplash: false, splashRadiusMult: 1, critChance: 0, critDamage: 0, flatpowerLevel: 0, helperLevel: 0, helperTimer: 0, poisonLevel: 0, poisonTimer: 0, freezeLevel: 0, freezeTimer: 0, turretLevel: 0, turretCd: 0, boomerangLevel: 0, boomerangTimer: 0, expMult: 1, damageTakenMult: 1, revivesLeft: 0, cardChoices: 3,
         laserLevel: 0, laserCooldown: 0,
         chainLevel: 0, bombLevel: 0, bombTimer: 0,
         tornadoLevel: 0, tornadoAngle: 0
@@ -1280,7 +1491,7 @@ function update(dt) {
         }
     }
 
-    if (player.tornadoLevel > 0) {
+    if (player.tornadoLevel > 0 && !isPlasmaMode()) {   // 플라즈마 토네이도 상태에서는 기존 회오리 구슬을 숨기고 피해도 주지 않음
         let speedMult = 1 + (player.tornadoLevel - 1) * 0.05;
         player.tornadoAngle += dt * 3.0 * speedMult;
         updateTornadoHits(dt);
@@ -1290,6 +1501,12 @@ function update(dt) {
     updatePoison(dt);
     updateFreeze(dt);
     updatePlasma(dt);
+    updateCityBosses(dt);
+    updatePet(dt);
+    updateTurret(dt);
+    updateBoomerangs(dt);
+    updatePetUI();
+    updateTurretUI();
 
     itemSpawnTimer += dt;
     if (itemSpawnTimer >= 30.0) {
@@ -1344,7 +1561,9 @@ function spawnEnemies(dt) {
     let spawnRate = Math.min(8, 1.8 + killCount / 25) * Math.min(1, 0.5 + gameTime / 300);
     if (Math.random() < spawnRate * dt) {
         let names;
-        if (bgStage === 0) {
+        if (currentWorld === 'city') {
+            names = CITY_STAGE_MONSTERS[bgStage];
+        } else if (bgStage === 0) {
             names = EARLY_MONSTERS.find(g => player.level <= g.maxLevel).names;
         } else {
             names = STAGE_MONSTERS[bgStage];
@@ -1367,6 +1586,15 @@ function spawnEnemies(dt) {
 
 function checkBossMilestone() {
     // 아직 안 나온 보스 중, 레벨 조건을 채운 가장 낮은 보스를 하나씩 소환합니다.
+    if (currentWorld === 'city') {
+        if (enemies.some(e => e.isBoss)) return;
+        const nextC = CITY_BOSS_LEVELS.find(b => b > bossSpawnedForLevel && b <= player.level);
+        if (nextC !== undefined) {
+            bossSpawnedForLevel = nextC;
+            spawnCityBoss(nextC);
+        }
+        return;
+    }
     if (enemies.some(e => e.isBoss)) return;
     const next = BOSS_LEVELS.find(b => b > bossSpawnedForLevel && b <= player.level);
     if (next !== undefined) {
@@ -1686,14 +1914,192 @@ function resumeGame() {
     document.getElementById('pause-modal').classList.add('hidden');
 }
 // 메인 화면으로: 이번 판은 저장하지 않고 종료합니다 (코인 지급 없음)
+function updateCityButton() {
+    const b = document.getElementById('city-btn');
+    if (!b) return;
+    b.disabled = !save.clearedBase;
+    b.textContent = save.clearedBase ? '🏙️ 대도시' : '🔒 대도시 (황궁 던전 최종 보스 클리어 필요)';
+}
+
 function goMainMenu() {
     gameState = 'START';
     resetJoystick();
     ['menu-modal', 'pause-modal', 'levelup-modal', 'gameover-modal', 'shop-modal', 'character-select-modal']
         .forEach(id => document.getElementById(id).classList.add('hidden'));
-    ['stats-toggle', 'end-run-btn', 'menu-btn'].forEach(id => document.getElementById(id).classList.add('hidden'));
+    ['stats-toggle', 'end-run-btn', 'menu-btn', 'pet-skill-btn'].forEach(id => document.getElementById(id).classList.add('hidden'));
+    petRun = null;
     refreshCoinLabels();
+    updateCityButton();
     document.getElementById('start-modal').classList.remove('hidden');
+}
+
+// ===== 포탑 =====
+function placeTurret() {
+    if (player.turretLevel <= 0 || gameState !== 'PLAYING') return;
+    if (turret || player.turretCd > 0) return;
+    turret = { x: player.x, y: player.y, hp: TOWER_HP, life: towerDuration(player.turretLevel) };
+    player.turretCd = TOWER_COOLDOWN;
+    createParticles(player.x, player.y, '#ffe6a0', 16);
+    showAnnouncement('🗼 포탑 설치! 몬스터들이 포탑으로 몰려갑니다', 2000);
+}
+
+function updateTurret(dt) {
+    if (player.turretCd > 0) player.turretCd = Math.max(0, player.turretCd - dt);
+    if (!turret) return;
+    turret.life -= dt;
+    for (const e of enemies) {
+        if (e.isBoss) continue;
+        const r = e.tier.radius;
+        if (Math.hypot(e.x - turret.x, e.y - turret.y) < TOWER_RADIUS + r) {
+            turret.hp -= TOWER_DPS_PER_ENEMY * dt;
+        }
+    }
+    if (turret.hp <= 0 || turret.life <= 0) {
+        createParticles(turret.x, turret.y, '#ffe6a0', 14);
+        turret = null;     // 파괴되거나 시간이 끝나면 몬스터는 다시 플레이어를 향함
+    }
+}
+
+// ===== 부메랑 =====
+function updateBoomerangs(dt) {
+    if (player.boomerangLevel <= 0) return;
+    player.boomerangTimer += dt * player.attackSpeedRatio;
+    if (player.boomerangTimer >= BOOMER_INTERVAL) {
+        player.boomerangTimer = 0;
+        const n = player.boomerangLevel;
+        const near = getNearestEnemies(n, player.x, player.y);
+        for (let i = 0; i < n; i++) {
+            // 가까운 적 방향으로 하나씩 (적이 적으면 바라보는 방향)
+            const t = near[i] || near[0];
+            const a = t ? Math.atan2(t.y - player.y, t.x - player.x) : player.facingAngle + (i - (n - 1) / 2) * 0.3;
+            const edge = getLaserScreenEnd(player.x, player.y, a).distance;   // 화면 가장자리까지 거리
+            boomerangs.push({
+                x: player.x, y: player.y,
+                dx: Math.cos(a), dy: Math.sin(a),
+                outDist: Math.min(edge, 900),
+                traveled: 0,
+                phase: 'out',
+                hit: new Set(),
+                spin: Math.random() * 6
+            });
+        }
+    }
+
+    for (let i = boomerangs.length - 1; i >= 0; i--) {
+        const b = boomerangs[i];
+        b.spin += dt * 16;
+        b.trail = b.trail || [];
+        b.trail.push({ x: b.x, y: b.y });
+        if (b.trail.length > 8) b.trail.shift();
+        if (b.phase === 'out') {
+            const step = BOOMER_OUT_SPEED * dt;
+            b.x += b.dx * step;
+            b.y += b.dy * step;
+            b.traveled += step;
+            if (b.traveled >= b.outDist) b.phase = 'back';
+        } else {
+            const dx = player.x - b.x, dy = player.y - b.y;
+            const d = Math.hypot(dx, dy);
+            if (d < 26) { boomerangs.splice(i, 1); continue; }
+            const step = Math.min(d, BOOMER_BACK_SPEED * dt);
+            b.x += dx / d * step;
+            b.y += dy / d * step;
+        }
+        // 맞은 적은 한 번의 이동 동안 한 번만 피해
+        for (const e of enemies) {
+            if (b.hit.has(e)) continue;
+            const r = e.isBoss ? 28 : e.tier.radius;
+            if (Math.hypot(e.x - b.x, e.y - b.y) < 18 + r) {
+                b.hit.add(e);
+                const res = applyCrit(player.attackPower * BOOMER_DMG);
+                e.hp -= res.damage;
+                createDamageText(e.x, e.y, Math.round(res.damage), res.crit ? CRIT_TEXT_COLOR : '#ffffff');
+            }
+        }
+    }
+}
+
+function updateTurretUI() {
+    const btn = document.getElementById('turret-btn');
+    if (!btn) return;
+    const show = player.turretLevel > 0 && (gameState === 'PLAYING' || gameState === 'PAUSED' || gameState === 'LEVELUP');
+    btn.classList.toggle('hidden', !show);
+    if (!show) return;
+    let label;
+    if (turret) label = `🗼 ${Math.ceil(turret.life)}초`;
+    else if (player.turretCd > 0) label = `🗼 ${Math.ceil(player.turretCd)}초`;
+    else label = '🗼';
+    if (btn.textContent !== label) btn.textContent = label;
+    btn.disabled = !!turret || player.turretCd > 0;
+}
+
+function drawTurretAndBoomerangs() {
+    if (turret) {
+        ctx.save();
+        if (towerImg.complete && towerImg.naturalWidth > 0) {
+            const ratio = towerImg.naturalWidth / towerImg.naturalHeight;
+            let w = TOWER_DRAW, h = TOWER_DRAW;
+            if (ratio >= 1) h = TOWER_DRAW / ratio; else w = TOWER_DRAW * ratio;
+            ctx.imageSmoothingEnabled = SPRITE_SMOOTHING;
+            ctx.drawImage(towerImg, turret.x - w / 2, turret.y - h / 2, w, h);
+        } else {
+            ctx.font = '40px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('🗼', turret.x, turret.y);
+        }
+        // 몬스터를 끌어들이는 범위(얇은 원)
+        ctx.globalAlpha = 0.35;
+        ctx.strokeStyle = '#ffe6a0';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 6]);
+        ctx.beginPath();
+        ctx.arc(turret.x, turret.y, TOWER_RADIUS + 14, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 1;
+        // 체력 바
+        const barY = turret.y - TOWER_DRAW / 2 - 12;
+        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        ctx.fillRect(turret.x - 34, barY, 68, 8);
+        ctx.fillStyle = '#ffe6a0';
+        ctx.fillRect(turret.x - 34, barY, Math.max(0, turret.hp / TOWER_HP) * 68, 8);
+        ctx.restore();
+    }
+    if (boomerangs.length) {
+        ctx.save();
+        for (const b of boomerangs) {
+            ctx.save();
+            ctx.translate(b.x, b.y);
+            ctx.rotate(b.spin);
+            if (boomerImg.complete && boomerImg.naturalWidth > 0) {
+                const ratio = boomerImg.naturalWidth / boomerImg.naturalHeight;
+                let w = BOOMER_DRAW, h = BOOMER_DRAW;
+                if (ratio >= 1) h = BOOMER_DRAW / ratio; else w = BOOMER_DRAW * ratio;
+                ctx.imageSmoothingEnabled = SPRITE_SMOOTHING;
+                ctx.drawImage(boomerImg, -w / 2, -h / 2, w, h);
+            } else {
+                ctx.fillStyle = '#ffd84a';
+                ctx.beginPath();
+                ctx.arc(0, 0, 14, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
+            // 지나온 자리 궤적 (점 여러 개를 점점 흐리게)
+            if (b.trail && b.trail.length) {
+                ctx.save();
+                ctx.fillStyle = '#ffd84a';
+                b.trail.forEach((t, i) => {
+                    ctx.globalAlpha = (i + 1) / b.trail.length * 0.5;
+                    ctx.beginPath();
+                    ctx.arc(t.x, t.y, 4 + (i / b.trail.length) * 3, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+                ctx.restore();
+            }
+        }
+        ctx.restore();
+    }
 }
 
 function playerMainDps() {
@@ -1713,11 +2119,177 @@ const BOSS_STATS = {
     60: { minHp: 40000, seconds: 90, speed: 0.7, contact: 50, bullets: 24, interval: 1.4, bulletDmg: 22, bulletSpeed: 4.8 }
 };
 
+// ===== 대도시 보스 =====
+function spawnCityBoss(level) {
+    const bs = CITY_BOSS_STATS[level];
+    showAnnouncement(`⚠️ [Lv.${level}] ${CITY_BOSS_NAMES[level]} 등장! ⚠️`, 3000);
+    SFX.play('boss');
+    setBackgroundStage(CITY_BOSS_STAGE[level]);
+
+    const angle = Math.random() * Math.PI * 2;
+    const hp = Math.max(bs.minHp, Math.round(bs.seconds * playerMainDps()));
+    enemies.push({
+        x: player.x + Math.cos(angle) * 480,
+        y: player.y + Math.sin(angle) * 480,
+        tier: { name: `City${level}`, color: '#ffffff', radius: 28 },
+        hp, maxHp: hp,
+        speed: BASE_BOSS_SPEED * bs.speed,
+        stats: bs,
+        isBoss: true,
+        cityBoss: true,
+        bossLevel: level,
+        spriteKey: bs.sprite,
+        shootTimer: 0
+    });
+    if (level === 30) gachaTimer = 0;
+    if (level === 45) { toyTimer = 0; spawnToys(); }
+}
+
+function onCityBossKilled(e) {
+    cityBossKills++;
+    player.hp = Math.min(player.maxHp, player.hp + 30);
+    if (cityBossKills >= CITY_CLEAR_BOSS_COUNT) {
+        recordClear();
+        setBackgroundStage(5);   // 클리어 후 마지막 배경 (City9 등장)
+        showAnnouncement('🏆 대도시 클리어! (우측 하단 버튼으로 종료)', 4000);
+    } else {
+        showAnnouncement(`🎉 ${CITY_BOSS_NAMES[e.bossLevel]} 처치! HP 30 회복`);
+    }
+    // 부장좀비(20)·가챠기계(30) 처치 시 공짜 스킬 선택창
+    if (e.bossLevel === 20 || e.bossLevel === 30) triggerLevelUp();
+}
+
+// 유치원생이 살아 있는 동안 20초마다 장난감 성(City7)과 요요(City8)를 각 20마리씩 스폰 (상한 100)
+function spawnToys() {
+    if (!enemies.some(e => e.cityBoss && e.bossLevel === 45)) return;
+    const isToy = e => e.tier && (e.tier.name === 'City7' || e.tier.name === 'City8');
+    let room = TOY_CAP - enemies.filter(isToy).length;
+    for (const name of ['City7', 'City8']) {
+        const n = Math.max(0, Math.min(TOY_SPAWN_COUNT, room));
+        room -= n;
+        const tier = RAINBOW_TIERS.find(t => t.name === name);
+        for (let i = 0; i < n; i++) {
+            const a = Math.random() * Math.PI * 2;
+            const hp = tier.hp + Math.max(0, gameTime - 40) * 1.5;
+            enemies.push({
+                x: player.x + Math.cos(a) * 520,
+                y: player.y + Math.sin(a) * 520,
+                tier, hp, maxHp: hp,
+                speed: BASE_ENEMY_SPEED * tier.speedMult
+            });
+        }
+    }
+}
+
+// 대도시 보스 시간 로직: 가챠기계 룰렛 / 유치원생 스폰
+function updateCityBosses(dt) {
+    if (currentWorld !== 'city') return;
+    if (enemies.some(e => e.cityBoss && e.bossLevel === 30)) {
+        gachaTimer += dt;
+        if (!roulette && gachaTimer >= GACHA_INTERVAL) {
+            gachaTimer = 0;
+            roulette = { phase: 'spin', t: 0, stepT: 0, idx: 0, result: rollRoulette() };
+        }
+    }
+    if (roulette) updateRoulette(dt);
+    if (enemies.some(e => e.cityBoss && e.bossLevel === 45)) {
+        toyTimer += dt;
+        if (toyTimer >= TOY_SPAWN_INTERVAL) {
+            toyTimer = 0;
+            spawnToys();
+        }
+    }
+}
+
+function rollRoulette() {
+    const total = ROULETTE_ITEMS.reduce((a, b) => a + b.weight, 0);
+    let r = Math.random() * total;
+    for (let i = 0; i < ROULETTE_ITEMS.length; i++) {
+        r -= ROULETTE_ITEMS[i].weight;
+        if (r < 0) return i;
+    }
+    return 0;
+}
+
+function updateRoulette(dt) {
+    const R = roulette;
+    if (R.phase === 'spin') {
+        R.t += dt;
+        R.stepT += dt;
+        const step = 0.07 + 0.25 * Math.pow(R.t / 1.4, 2);      // 점점 느려지는 연출
+        if (R.stepT >= step) {
+            R.stepT = 0;
+            R.idx = (R.idx + 1) % ROULETTE_ITEMS.length;
+        }
+        if (R.t >= 1.4) {
+            R.phase = 'result';
+            R.t = 0;
+            R.idx = R.result;
+            applyRouletteResult(R.result);
+        }
+    } else if (R.phase === 'result') {
+        R.t += dt;
+        if (R.t >= 1.6) roulette = null;
+    }
+}
+
+// 디버프 적용. 공격력/공격속도/이동속도는 게임 시작 시점의 스탯 아래로 내려가지 않음
+function applyRouletteResult(idx) {
+    const it = ROULETTE_ITEMS[idx];
+    if (it.kind === 'hp') {
+        player.hp -= it.value;
+        createDamageText(player.x, player.y, it.value, '#ff3366');
+    } else if (it.kind === 'ap') {
+        player.attackPower = Math.max(player.floorAP, player.attackPower - 10);
+    } else if (it.kind === 'asr') {
+        player.attackSpeedRatio = Math.max(player.floorASR, player.attackSpeedRatio * 0.95);
+    } else if (it.kind === 'spd') {
+        player.speed = Math.max(player.floorSPD, player.speed * 0.95);
+    }
+    showAnnouncement(`🎰 룰렛 결과: ${it.label}`, 2000);
+}
+
+function drawRoulette() {
+    if (!roulette) return;
+    const W = canvas.width;
+    const bw = 240, rowH = 22, pad = 12;
+    const bh = pad * 2 + 30 + ROULETTE_ITEMS.length * rowH;
+    const x = W / 2 - bw / 2, y = 70;
+    ctx.save();
+    ctx.fillStyle = 'rgba(12, 12, 30, 0.92)';
+    ctx.fillRect(x, y, bw, bh);
+    ctx.strokeStyle = '#c8a0ff';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, bw, bh);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffe600';
+    ctx.font = `bold ${Math.round(15 * UI_SCALE)}px Arial`;
+    ctx.fillText('🎰 가챠 룰렛', x + pad, y + pad + 8);
+    ctx.font = `${Math.round(13 * UI_SCALE)}px Arial`;
+    ROULETTE_ITEMS.forEach((it, i) => {
+        const ry = y + pad + 30 + i * rowH + rowH / 2;
+        const hl = i === roulette.idx;
+        if (hl) {
+            ctx.fillStyle = 'rgba(255, 230, 0, 0.35)';
+            ctx.fillRect(x + 4, ry - rowH / 2, bw - 8, rowH);
+        }
+        ctx.fillStyle = hl ? '#ffffff' : '#bbbbbb';
+        ctx.fillText(it.label, x + pad, ry);
+    });
+    if (roulette.phase === 'result') {
+        ctx.fillStyle = '#ff6b8a';
+        ctx.font = `bold ${Math.round(14 * UI_SCALE)}px Arial`;
+        ctx.fillText(`결과: ${ROULETTE_ITEMS[roulette.result].label}`, x + pad, y + bh + 18);
+    }
+    ctx.restore();
+}
+
 function spawnBoss(levelTier) {
     let bossNames = {
-        10: "악령이 된 기사",
-        20: "타락한 마법사",
-        30: "죽지 않는 초대왕",
+        10: "타락한 마법사",
+        20: "죽지 않는 초대왕",
+        30: "악령이 된 기사",
         40: "불타버린 영혼",
         60: "전직 수호자"
     };
@@ -1878,7 +2450,7 @@ function fireLaser() {
             length: end.distance,
             width: 22,
             duration: 1.0,
-            damage: player.attackPower * 1.5,
+            damage: player.attackPower * 1.5 * (player.areaMult || 1),
             endX: end.x,
             endY: end.y,
             hitEffectSpawned: false
@@ -1898,10 +2470,12 @@ const BOSS_KNOCKBACK_RATIO = 0.3;
 // 폭탄/회오리 피해 설정 (숫자만 바꾸면 레벨별 피해가 달라집니다)
 const BOMB_DMG_BASE = 0.70;          // 폭탄 1레벨 피해 (공격력 배율)
 const BOMB_DMG_PER_LEVEL = 0.15;     // 폭탄 레벨당 피해 증가율 (0.15 = 레벨마다 +15%)
+const TORNADO_BASE_DMG = 0.75;        // 회오리가 한 번 스칠 때의 피해 배율 (1레벨 기준: 공격력 × 0.75)
+const TORNADO_HIT_INTERVAL = 0.3;     // 같은 회오리 구슬이 같은 적을 다시 칠 수 있는 최소 간격(초)
 const TORNADO_DMG_PER_LEVEL = 0.12;  // 회오리 레벨당 피해 증가율 (0.12 = 레벨마다 +12%)
 
 function triggerBomb() {
-    let bombDamage = player.attackPower * BOMB_DMG_BASE * (1 + BOMB_DMG_PER_LEVEL * (player.bombLevel - 1));
+    let bombDamage = player.attackPower * BOMB_DMG_BASE * (1 + BOMB_DMG_PER_LEVEL * (player.bombLevel - 1)) * (player.areaMult || 1);
     let radius =
         130 * (1 + (player.bombLevel - 1) * 0.10);
     const knockback = player.bombLevel >= BOMB_KNOCKBACK_LEVEL ? BOMB_KNOCKBACK_DISTANCE : 0;
@@ -1926,43 +2500,32 @@ function tornadoOrbitDist() {
     return player.tornadoLevel >= 10 ? TORNADO_RADIUS_WIDE : TORNADO_RADIUS_NORMAL;
 }
 
+// 회오리는 '스치는 순간' 한 번 피해를 줍니다 (공격력 × TORNADO_BASE_DMG, 레벨당 증가)
+// 같은 구슬이 같은 적을 계속 스치고 있으면 TORNADO_HIT_INTERVAL 마다 한 번씩만 다시 맞음
 function updateTornadoHits(dt) {
-    let count = player.tornadoLevel;
-    let dist = tornadoOrbitDist();
-
-    let baseDmgMult =
-        0.50 * (1 + (player.tornadoLevel - 1) * TORNADO_DMG_PER_LEVEL);
-
-    let damage = player.attackPower * baseDmgMult;
+    const count = player.tornadoLevel;
+    const dist = tornadoOrbitDist();
+    const mult = TORNADO_BASE_DMG * (1 + (player.tornadoLevel - 1) * TORNADO_DMG_PER_LEVEL);
+    const damage = player.attackPower * mult * (player.areaMult || 1);
 
     for (let i = 0; i < count; i++) {
-        let angle =
-            player.tornadoAngle +
-            (Math.PI * 2 / count) * i;
+        const angle = player.tornadoAngle + (Math.PI * 2 / count) * i;
+        const tx = player.x + Math.cos(angle) * dist;
+        const ty = player.y + Math.sin(angle) * dist;
 
-        let tx = player.x + Math.cos(angle) * dist;
-        let ty = player.y + Math.sin(angle) * dist;
+        for (const e of enemies) {
+            const radius = e.isBoss ? 28 : e.tier.radius;
+            if (Math.hypot(tx - e.x, ty - e.y) >= 18 + radius) continue;
 
-        enemies.forEach(e => {
-            let radius = e.isBoss ? 28 : e.tier.radius;
+            // 구슬마다 적별로 다음 타격 가능 시간을 따로 기록
+            if (!e.torNext) e.torNext = {};
+            if (gameTime < (e.torNext[i] || 0)) continue;
+            e.torNext[i] = gameTime + TORNADO_HIT_INTERVAL;
 
-            if (
-                Math.hypot(tx - e.x, ty - e.y) <
-                18 + radius
-            ) {
-                // 지속 피해라서 프레임마다 치명타를 판정합니다 (평균적으로 같은 효과)
-                const r = applyCrit(damage * dt * 3);
-
-                e.hp -= r.damage;
-
-                createDamageText(
-                    e.x,
-                    e.y,
-                    Math.round(r.damage),
-                    r.crit ? CRIT_TEXT_COLOR : '#fff'
-                );
-            }
-        });
+            const r = applyCrit(damage);
+            e.hp -= r.damage;
+            createDamageText(e.x, e.y, Math.round(r.damage), r.crit ? CRIT_TEXT_COLOR : '#fff');
+        }
     }
 }
 
@@ -2333,7 +2896,8 @@ function updateEnemies(dt) {
         let e = enemies[i];
         let radius = e.isBoss ? 28 : e.tier.radius;
         let dist = Math.hypot(player.x - e.x, player.y - e.y);
-        let angle = Math.atan2(player.y - e.y, player.x - e.x);
+        const tgt = (turret && !e.isBoss) ? turret : player;   // 포탑이 있으면 일반 몬스터는 포탑으로 몰려감
+        let angle = Math.atan2(tgt.y - e.y, tgt.x - e.x);
 
         if (!isFrozen(e)) {               // 동결 상태면 이동하지 않음
             e.x += Math.cos(angle) * e.speed;
@@ -2388,9 +2952,17 @@ function updateEnemies(dt) {
                 }
             }
 
+            if ((player.lifeLevel || 0) > 0 && Math.random() < 0.05 * player.lifeLevel) {
+                player.hp = Math.min(player.maxHp, player.hp + player.lifeLevel);   // 체력 1 × 레벨
+            }
+            if (player.passive === 'doctor' && Math.random() < 0.01) {
+                player.hp = Math.min(player.maxHp, player.hp + 3);   // 의사: 응급처치
+            }
+
             if (e.isBoss) {
                 bossKills++;
-                handleBossRewards(e.bossLevel);
+                if (e.cityBoss) onCityBossKilled(e);
+                else handleBossRewards(e.bossLevel);
                 if (e.bossLevel === 60 && !clearSnapshot) recordClear();
             } else if (e.tier.exp > 0) {
                 expGems.push({ x: e.x, y: e.y, val: e.tier.exp });
@@ -2546,6 +3118,8 @@ function selectSkill(id) {
         if (player.poisonLevel === 0) player.poisonTimer = POISON_BASE_INTERVAL - POISON_FIRST_DELAY;   // 처음 얻으면 곧바로 첫 설치
         player.poisonLevel = Math.min(POISON_MAX_LEVEL, player.poisonLevel + 1);
     }
+    if (id === 'turret') player.turretLevel = Math.min(5, player.turretLevel + 1);
+    if (id === 'boomerang') player.boomerangLevel = Math.min(5, player.boomerangLevel + 1);
     if (id === 'freeze') {
         if (player.freezeLevel === 0) player.freezeTimer = freezeCooldown(1) - 2;   // 처음 얻으면 2초 뒤 첫 파동
         player.freezeLevel = Math.min(FREEZE_MAX_LEVEL, player.freezeLevel + 1);
@@ -2572,7 +3146,13 @@ function render() {
     let img;
 
     // 경험치 값에 따라 이미지 선택
-    if (g.val < 20) {
+    if (g.val >= 2000) {
+        img = expGemImg7;
+    } else if (g.val >= 1000) {
+        img = expGemImg6;
+    } else if (g.val >= 600) {
+        img = expGemImg5;
+    } else if (g.val < 20) {
         img = expGemImg1;
     } else if (g.val <= 60) {
         img = expGemImg2;
@@ -2614,7 +3194,7 @@ function render() {
     ctx.restore();
 
     // 회오리 렌더링 (PNG 이미지, 로딩 실패 시 기존 원형으로 대체)
-    if (player.tornadoLevel > 0) {
+    if (player.tornadoLevel > 0 && !isPlasmaMode()) {   // 플라즈마 토네이도 상태에서는 기존 회오리 구슬을 그리지 않음
         let count = player.tornadoLevel;
         let dist = tornadoOrbitDist();
         const tornadoReady = tornadoImg.complete && tornadoImg.naturalWidth > 0;
@@ -2722,7 +3302,7 @@ function render() {
     enemies.forEach(e => {
         // 표시 크기만 PNG 크기로 변경합니다. 충돌/공격 판정 반경은 기존 값 그대로입니다.
         const radius = e.isBoss ? 28 : e.tier.radius;
-        const spriteKey = e.isBoss ? `Boss${e.bossLevel}` : e.tier.name;
+        const spriteKey = e.spriteKey || (e.isBoss ? `Boss${e.bossLevel}` : e.tier.name);
         const img = ENEMY_IMAGES[spriteKey];
         const spriteSize = e.isBoss ? BOSS_SPRITE_SIZE : ENEMY_SPRITE_SIZE;
         const imageReady = img && img.loaded && !img.failed && img.naturalWidth > 0;
@@ -2773,6 +3353,8 @@ function render() {
     drawHelper();          // 👼 아군 천사
     drawPoisons();         // ☠️ 독 구름
     drawFreezeEffects();   // ❄️ 빙결 파동 / 얼음 상태
+    drawTurretAndBoomerangs();   // 🗼 포탑 / 🪃 부메랑 (월드 좌표)
+    drawPet();            // 🐾 펫 (월드 좌표, 플레이어 오른쪽 대각선 아래)
     renderVisualEffects(); // 💥 폭발 애니메이션 및 연쇄전격 렌더링
     renderParticles();
     renderFloatingTexts();
@@ -2780,6 +3362,7 @@ function render() {
     ctx.restore();
 
     drawItemArrows();     // 화면 밖 아이템 화살표 (화면 좌표)
+    drawRoulette();       // 🎰 가챠 룰렛 (화면 좌표)
     renderHUD();
 }
 
@@ -2902,14 +3485,14 @@ function drawPlayerSprite() {
 }
 
 function setBackgroundStage(stage) {
-    if (stage === bgStage || stage < 0 || stage >= bgImages.length) return;
+    if (stage === bgStage || stage < 0 || stage >= activeBgImages().length) return;
     bgPrevStage = bgStage;
     bgStage = stage;
     bgFade = 0;
 }
 
 function bgReady(i) {
-    const im = bgImages[i];
+    const im = activeBgImages()[i];
     return !!im && im.complete && im.naturalWidth > 0;
 }
 
@@ -2940,10 +3523,10 @@ function drawBackground() {
     ctx.imageSmoothingQuality = 'high';
 
     if (bgFade < 1 && bgReady(bgPrevStage)) {
-        drawBgLayer(bgImages[bgPrevStage]);
+        drawBgLayer(activeBgImages()[bgPrevStage]);
         ctx.globalAlpha = bgFade;
     }
-    drawBgLayer(bgImages[bgStage]);
+    drawBgLayer(activeBgImages()[bgStage]);
     ctx.globalAlpha = 1;
 
     if (BG_DIM > 0) {
@@ -3025,6 +3608,8 @@ function renderStatsPanel() {
     if (player.helperLevel > 0)  skillLines.push(`👼 도와줘! Lv.${player.helperLevel}${maxTag(player.helperLevel, 5)}`);
     if (player.poisonLevel > 0)  skillLines.push(`☠️ 독 Lv.${player.poisonLevel}${maxTag(player.poisonLevel, 7)}`);
     if (player.freezeLevel > 0)  skillLines.push(`❄️ 빙결 Lv.${player.freezeLevel}${maxTag(player.freezeLevel, 7)}`);
+    if (player.turretLevel > 0)  skillLines.push(`🗼 포탑 Lv.${player.turretLevel}${maxTag(player.turretLevel, 5)}`);
+    if (player.boomerangLevel > 0) skillLines.push(`🪃 부메랑 Lv.${player.boomerangLevel}${maxTag(player.boomerangLevel, 5)}`);
     if (skillLines.length) { lines.push('— 스킬 —'); lines.push(...skillLines); }
 
     ctx.save();
@@ -3104,6 +3689,173 @@ const SAVE_KEY = 'pixelSurvivors_save_v1';
 // 상점 치명타 확률: 레벨별 '누적' 증가량(%). 인덱스 = 구매한 레벨 (0레벨 ~ 15레벨)
 const CRIT_SHOP_TOTAL = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 34, 38, 42, 46, 50];
 
+let trainTab = 'stats';
+
+// ===== 펫 (1마리 장착, 플레이어 오른쪽 하단을 따라다님) =====
+const PETS = [
+    { id: 'phone', name: '스마트폰', icon: '📱', img: 'images/pet1.png', price: 5500,
+      desc: '300초 이후 맵의 모든 적 처치 (보스는 체력 70% 감소, 레벨당 +3%p). 1판 1회, 5레벨부터 2회.' },
+    { id: 'nero',  name: '네로',     icon: '🐶', img: 'images/pet2.png', price: 6000,
+      desc: '공격력 0.5배 피해로 적을 공격. 공격속도는 플레이어 공격속도의 0.5배.' },
+    { id: 'duck',  name: '오리',     icon: '🦆', img: 'images/pet3.png', price: 3000,
+      desc: '60초마다 3초 무적.' },
+    { id: 'bread', name: '붕어빵',   icon: '🐟', img: 'images/pet4.png', price: 4500,
+      desc: '30초마다 체력 5 회복.' }
+];
+const PET_MAX_LEVEL = 5;
+const PET_PHONE_UNLOCK_SEC = 300;
+const PET_FOLLOW_X = 64, PET_FOLLOW_Y = 48;          // 플레이어 기준 오른쪽 하단 위치
+const PET_BOX = 52;                                   // 펫 그림 크기(px)
+const petImgs = {};
+const towerImg = new Image();
+towerImg.src = 'images/tower_a.png';
+const boomerImg = new Image();
+boomerImg.src = 'images/boomer.png';
+PETS.forEach(p => { const im = new Image(); im.src = p.img; petImgs[p.id] = im; });
+let petRun = null;
+
+// ===== 포탑 (레벨 5 최대, 80초 쿨타임, 설치 위치는 플레이어 위치) =====
+const TOWER_COOLDOWN = 80;
+const TOWER_HP = 100;
+const TOWER_DPS_PER_ENEMY = 8;      // 포탑과 맞닿은 몬스터 1마리가 1초에 주는 피해
+const TOWER_RADIUS = 28;
+const TOWER_DRAW = 96;              // 포탑 그림 크기(px)
+const BOOMER_DRAW = 60;             // 부메랑 그림 크기(px)
+let turret = null;                  // {x, y, hp, life}
+
+// ===== 부메랑 =====
+const BOOMER_INTERVAL = 2.5;        // 발사 주기(초, 공격속도에 따라 짧아짐)
+const BOOMER_OUT_SPEED = 600;       // 나가는 속도(px/s)
+const BOOMER_BACK_SPEED = 720;      // 돌아오는 속도(px/s)
+const BOOMER_DMG = 0.9;             // 공격력 배율
+let boomerangs = [];
+
+function towerDuration(lv) { return 5 + 3 * (lv - 1); }                                    // 이번 판에서 장착한 펫 상태
+
+// 펫 레벨별 효과 (레벨 1 기준, 레벨당 증가분은 아래 함수에서 조절)
+function petLevelCost(lv) { return Math.round(1000 * Math.pow(1.4, lv - 1)); }   // 임시값: lv → lv+1 비용
+function petPhoneCharges(lv) { return lv >= 5 ? 2 : 1; }      // 4레벨까지 1회, 5레벨부터 2회
+function petPhoneBossRatio(lv) { return 0.70 + 0.03 * (lv - 1); }  // 레벨당 +3%p                 // 보스 체력 감소 비율
+function petNeroMult(lv) { return 1 + 0.2 * (lv - 1); }                           // 네로 피해/공속 배율
+function petDuckDuration(lv) { return 3 + 0.5 * (lv - 1); }                       // 오리 무적 시간(초)
+function petBreadHeal(lv) { return 5 + 2 * (lv - 1); }                            // 붕어빵 회복량
+
+function initPetRun() {
+    petRun = null;
+    const id = save.equippedPet;
+    if (!id || !save.pets[id]) return;
+    const lv = save.pets[id];
+    petRun = {
+        id, lv,
+        x: 0, y: 0,
+        timer: 0,              // 오리/붕어빵 주기 타이머
+        fireT: 0,              // 네로 발사 타이머
+        charges: id === 'phone' ? petPhoneCharges(lv) : 0,
+        bossRatio: id === 'phone' ? petPhoneBossRatio(lv) : 0
+    };
+}
+
+function updatePet(dt) {
+    if (!petRun) return;
+    // 플레이어 기준 오른쪽 대각선 아래에 고정 (도와줘 천사는 왼쪽 대각선 위)
+    petRun.x = player.x + PET_FOLLOW_X;
+    petRun.y = player.y + PET_FOLLOW_Y;
+
+    if (petRun.id === 'nero') {
+        // 공격속도 = 플레이어 공격속도 × 0.5 × 레벨 배율
+        petRun.fireT += dt * player.attackSpeedRatio * 0.5 * petNeroMult(petRun.lv);
+        if (petRun.fireT >= 1) {
+            petRun.fireT = 0;
+            const target = getNearestEnemies(1, petRun.x, petRun.y)[0];
+            if (target) {
+                const a = Math.atan2(target.y - petRun.y, target.x - petRun.x);
+                projectiles.push({
+                    x: petRun.x, y: petRun.y,
+                    vx: Math.cos(a) * 8.5, vy: Math.sin(a) * 8.5,
+                    pierce: 1,
+                    damage: player.attackPower * 0.5 * petNeroMult(petRun.lv),
+                    crit: false,
+                    color: '#ffb3ff',
+                    radius: 5
+                });
+            }
+        }
+    } else if (petRun.id === 'duck') {
+        petRun.timer += dt;
+        if (petRun.timer >= 60) {
+            petRun.timer = 0;
+            player.invincibleTimer = Math.max(player.invincibleTimer, petDuckDuration(petRun.lv));
+            createParticles(petRun.x, petRun.y, '#fff7a8', 8);
+        }
+    } else if (petRun.id === 'bread') {
+        petRun.timer += dt;
+        if (petRun.timer >= 30) {
+            petRun.timer = 0;
+            player.hp = Math.min(player.maxHp, player.hp + petBreadHeal(petRun.lv));
+            createDamageText(player.x, player.y - 20, petBreadHeal(petRun.lv), '#2ecc71');
+        }
+    }
+}
+
+// 스마트폰: 300초 이후 1회 작동 → 모든 일반 적 처치, 보스는 현재 체력의 일정 비율 감소
+function usePetSkill() {
+    if (!petRun || petRun.id !== 'phone') return;
+    if (gameState !== 'PLAYING' || gameTime < PET_PHONE_UNLOCK_SEC || petRun.charges <= 0) return;
+    petRun.charges--;
+    for (const e of enemies) {
+        if (e.isBoss) e.hp -= e.hp * petRun.bossRatio;
+        else e.hp = 0;
+    }
+    createParticles(player.x, player.y, '#7fd8ff', 30);
+    showAnnouncement('📱 스마트폰 작동! 맵의 적을 정리했어요', 2000);
+    SFX.play('boss');
+}
+
+function updatePetUI() {
+    const btn = document.getElementById('pet-skill-btn');
+    if (!btn) return;
+    const show = !!petRun && petRun.id === 'phone' && (gameState === 'PLAYING' || gameState === 'PAUSED' || gameState === 'LEVELUP');
+    btn.classList.toggle('hidden', !show);
+    if (!show) return;
+    let label;
+    if (petRun.charges <= 0) label = '📱 0';
+    else if (gameTime < PET_PHONE_UNLOCK_SEC) label = `📱 ${Math.ceil(PET_PHONE_UNLOCK_SEC - gameTime)}초`;
+    else label = `📱 ${petRun.charges}`;
+    if (btn.textContent !== label) btn.textContent = label;
+    btn.disabled = petRun.charges <= 0 || gameTime < PET_PHONE_UNLOCK_SEC;
+}
+
+function drawPet() {
+    if (!petRun) return;
+    const img = petImgs[petRun.id];
+    const bob = Math.sin(gameTime * 4) * 2;
+    if (img && img.complete && img.naturalWidth > 0) {
+        const ratio = img.naturalWidth / img.naturalHeight;
+        let w = PET_BOX, h = PET_BOX;
+        if (ratio >= 1) h = PET_BOX / ratio; else w = PET_BOX * ratio;
+        ctx.save();
+        ctx.imageSmoothingEnabled = SPRITE_SMOOTHING;
+        ctx.drawImage(img, petRun.x - w / 2, petRun.y - h / 2 + bob, w, h);
+        ctx.restore();
+    } else {
+        const pet = PETS.find(p => p.id === petRun.id);
+        ctx.save();
+        ctx.font = '30px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(pet.icon, petRun.x, petRun.y + bob);
+        ctx.restore();
+    }
+}
+
+// 새 스탯 (대도시 맵을 열면 해금). 가격은 임시값이며 나중에 조정합니다.
+const CITY_UPGRADES = [
+    { id: 'lifesteal', icon: '🩸', name: '생명력 흡수', desc: '몬스터 처치 시 확률(레벨당 +5%)로 체력 1 회복 (레벨당 +1)', city: true, max: 10, base: 1000, grow: 1.35 },
+    { id: 'crit2',     icon: '🎯', name: '치명타 확률 증가', desc: '치명타 확률 +2%', noSuffix: false, city: true, max: 10, base: 500, grow: 1.35 },
+    { id: 'critdmg2',  icon: '💢', name: '치명타 피해 증가', desc: '치명타 피해 +2%p', noSuffix: false, city: true, max: 15, base: 500, grow: 1.35 },
+    { id: 'atk2',      icon: '🔥', name: '공격력 증가', desc: '공격력 +2%', noSuffix: false, city: true, max: 25, base: 600, grow: 1.30 }
+];
+
 const UPGRADES = [
     { id: 'hp',       icon: '❤️', name: '체력 단련',   desc: '최대 HP +8',          max: 10, base: 30, grow: 1.30 },
     { id: 'power',    icon: '🔥', name: '공격력 훈련', desc: '공격력 +4%',          max: 10, base: 40, grow: 1.32 },
@@ -3114,7 +3866,8 @@ const UPGRADES = [
     { id: 'armor',    icon: '🛡️', name: '단단한 몸',   desc: '받는 피해 -4%',       max: 6,  base: 60, grow: 1.40 },
     { id: 'coin',     icon: '🍀', name: '행운의 동전', desc: '획득 코인 +10%',       max: 5,  base: 80, grow: 1.45 },
     { id: 'crit',     icon: '🎯', name: '치명타 확률', desc: '치명타 확률 최대 +50% (Lv.1~10: +3%씩 / Lv.11~15: +4%씩)', noSuffix: true, current: lv => `현재 +${CRIT_SHOP_TOTAL[lv]}%`, max: 15, base: 50, grow: 1.20 },
-    { id: 'revive',   icon: '✨', name: '부활',        desc: '사망 시 HP 50%로 부활', max: 2,  costs: [400, 1200] }
+    { id: 'revive',   icon: '✨', name: '부활',        desc: '사망 시 HP 50%로 부활', max: 2,  costs: [400, 1200] },
+    ...CITY_UPGRADES
 ];
 
 function upgradeCost(u, lv) {
@@ -3122,7 +3875,7 @@ function upgradeCost(u, lv) {
 }
 
 function loadSave() {
-    const fresh = { coins: 0, upgrades: {}, bestTime: 0, bestKills: 0, bestLevel: 0, runs: 0 };
+    const fresh = { coins: 0, upgrades: {}, bestTime: 0, bestKills: 0, bestLevel: 0, runs: 0, clearedBase: false, clearedCity: false, cityVisited: false, pets: {}, equippedPet: null, chars: {} };
     try {
         const raw = localStorage.getItem(SAVE_KEY);
         if (raw) return Object.assign(fresh, JSON.parse(raw));
@@ -3148,6 +3901,11 @@ function applyMetaUpgrades() {
     player.damageTakenMult = 1 - 0.04 * upLv('armor');
     player.revivesLeft = upLv('revive');
     player.critChance += CRIT_SHOP_TOTAL[Math.min(upLv('crit'), CRIT_SHOP_TOTAL.length - 1)] / 100;
+    // 대도시 해금 스탯
+    player.critChance += 0.02 * upLv('crit2');
+    player.critDamage += 2 * upLv('critdmg2');
+    player.attackPower *= 1 + 0.02 * upLv('atk2');
+    player.lifeLevel = upLv('lifesteal');   // 생명력 흡수 레벨 (처치 시 확률 5%×레벨, 회복 1%×레벨)
 }
 
 // ----- 60레벨 보스 처치 시 기록 고정 + 게임 종료 버튼 -----
@@ -3179,7 +3937,7 @@ function calcRunReward() {
         boss:  s.bossKills * 30              // 보스 1마리당 30코인
     };
     const sub = parts.time + parts.kills + parts.level + parts.boss;
-    const mult = 1 + 0.10 * upLv('coin');
+    const mult = (1 + 0.10 * upLv('coin')) * (currentWorld === 'city' ? 1.3 : 1) * (player.passive === 'dog' ? 1.15 : 1);
     return { parts, sub, mult, total: Math.max(1, Math.round(sub * mult)) };
 }
 
@@ -3195,13 +3953,15 @@ function endRun() {
     const newBest = s.time > save.bestTime;
     save.coins += r.total;
     save.runs += 1;
+    if (cleared && currentWorld === 'base') save.clearedBase = true;   // 황궁 던전 최종 보스 클리어 → 대도시 해금
+    if (cleared && currentWorld === 'city') save.clearedCity = true;   // 대도시 클리어 기록
     save.bestTime = Math.max(save.bestTime, s.time);
     save.bestKills = Math.max(save.bestKills, s.kills);
     save.bestLevel = Math.max(save.bestLevel, s.level);
     persistSave();
 
     const title = document.getElementById('gameover-title');
-    title.textContent = cleared ? '🎉 GAME CLEAR' : 'GAME OVER';
+    title.textContent = cleared ? (currentWorld === 'city' ? '🏆 CITY CLEAR' : '🎉 GAME CLEAR') : 'GAME OVER';
     title.style.color = cleared ? '#ffd84a' : '#ff3366';
     title.style.textShadow = cleared ? '0 0 16px #ffd84a' : '0 0 16px #ff3366';
 
@@ -3214,7 +3974,8 @@ function endRun() {
         <div>💀 처치 ${s.kills}마리 → +${r.parts.kills}</div>
         <div>⭐ 레벨 ${s.level} → +${r.parts.level}</div>
         ${s.bossKills ? `<div>👑 보스 ${s.bossKills}마리 → +${r.parts.boss}</div>` : ''}
-        ${r.mult > 1 ? `<div>🍀 행운의 동전 ×${r.mult.toFixed(1)}</div>` : ''}
+        ${currentWorld === 'city' ? `<div>🏙️ 대도시 보상 ×1.3</div>` : ''}
+        ${upLv('coin') > 0 ? `<div>🍀 행운의 동전 ×${(1 + 0.10 * upLv('coin')).toFixed(1)}</div>` : ''}
         <div class="total">🪙 획득 +${r.total}  (보유 ${save.coins})</div>`;
 
     refreshCoinLabels();
@@ -3228,6 +3989,7 @@ function refreshCoinLabels() {
 let shopReturnTo = 'start';
 function openShop(from) {
     shopReturnTo = from;
+    trainTab = 'stats';
     document.getElementById(from === 'gameover' ? 'gameover-modal' : 'start-modal').classList.add('hidden');
     renderShop();
     document.getElementById('shop-modal').classList.remove('hidden');
@@ -3238,10 +4000,198 @@ function closeShop() {
     refreshCoinLabels();
 }
 
+// 캐릭터별 기본 능력치 계산 (현재 강화 수치 반영)
+function computeCharStats(id) {
+    const c = CHARACTERS[id];
+    const atk = 25 * c.attackMult * (1 + 0.04 * upLv('power')) * (1 + 0.02 * upLv('atk2'));
+    const asr = c.attackSpeed * (1 + 0.03 * upLv('atkspeed'));
+    const spd = BASE_PLAYER_SPEED * c.moveMult * (1 + 0.02 * upLv('move'));
+    const hp = 100 + (c.hpBonus || 0) + 8 * upLv('hp');
+    const crit = c.crit + CRIT_SHOP_TOTAL[Math.min(upLv('crit'), CRIT_SHOP_TOTAL.length - 1)] / 100 + 0.02 * upLv('crit2');
+    const critDmg = CRIT_BASE_MULT + (c.critDmgBonus || 0) / 100 + 0.02 * upLv('critdmg2');   // 치명타 배율
+    return { atk, asr, spd, hp, crit, cards: c.cardChoices, shots: 1 + (c.extraBullets || 0), pierce: c.pierce, critDmg };
+}
+
+function renderInfoTab(grid) {
+    grid.innerHTML = '';
+    Object.entries(CHARACTERS).forEach(([id, c]) => {
+        const owned = isCharOwned(id);
+        const st = computeCharStats(id);
+        const item = document.createElement('div');
+        item.className = 'shop-item';
+        item.style.alignItems = 'flex-start';
+        item.innerHTML = `
+            <div class="s-icon">${owned ? c.icon : '🔒'}</div>
+            <div class="s-body">
+                <div class="s-name">${c.name}${owned ? '' : ' (미보유)'}</div>
+                <div class="s-desc">⚔️ 공격력 ${st.atk.toFixed(1)} · ⚡ 공격속도 ${st.asr.toFixed(2)}/초 · 🏃 이동속도 ${st.spd.toFixed(2)}</div>
+                <div class="s-desc">❤️ 최대 체력 ${Math.round(st.hp)} · 🎯 치명타 ${Math.round(st.crit * 100)}% (피해 ${(st.critDmg * 100).toFixed(0)}%) · 🏹 투사체 ${st.shots} · 🗡️ 관통 ${st.pierce}</div>
+                <div class="s-desc">🃏 레벨업 카드 ${st.cards}장 · ${c.ability}</div>
+            </div>`;
+        grid.appendChild(item);
+    });
+}
+
+function renderCharTab(grid) {
+    grid.innerHTML = '';
+    Object.entries(CHARACTERS).filter(([, c]) => c.price).forEach(([id, c]) => {
+        const owned = isCharOwned(id);
+        const item = document.createElement('div');
+        item.className = 'shop-item';
+        item.innerHTML = `
+            <div class="s-icon">${c.icon}</div>
+            <div class="s-body">
+                <div class="s-name">${c.name}</div>
+                <div class="s-desc">${c.ability}</div>
+                <div class="s-lv">${owned ? '보유 중' : '미보유'}</div>
+            </div>`;
+        const b = document.createElement('button');
+        if (owned) {
+            b.textContent = '보유';
+            b.disabled = true;
+        } else {
+            b.textContent = `🪙 ${c.price}`;
+            b.disabled = save.coins < c.price;
+            b.onclick = () => buyCharacter(id);
+        }
+        item.appendChild(b);
+        grid.appendChild(item);
+    });
+}
+
+function buyCharacter(id) {
+    const c = CHARACTERS[id];
+    if (isCharOwned(id) || save.coins < c.price) return;
+    save.coins -= c.price;
+    save.chars[id] = true;
+    persistSave();
+    renderShop();
+}
+
+function renderPetTab(grid) {
+    grid.innerHTML = '';
+    PETS.forEach(p => {
+        const owned = save.pets[p.id];           // 레벨(없으면 undefined)
+        const equipped = save.equippedPet === p.id;
+        const item = document.createElement('div');
+        item.className = 'shop-item';
+        const lvText = owned ? `Lv.${owned} / ${PET_MAX_LEVEL}${equipped ? '  · 장착 중' : ''}` : '미보유';
+        item.innerHTML = `
+            <div class="s-icon">${p.icon}</div>
+            <div class="s-body">
+                <div class="s-name">${p.name}</div>
+                <div class="s-desc">${p.desc}</div>
+                <div class="s-lv">${lvText}</div>
+            </div>`;
+        if (!owned) {
+            const b = document.createElement('button');
+            b.textContent = `🪙 ${p.price}`;
+            b.disabled = save.coins < p.price;
+            b.onclick = () => buyPet(p.id);
+            item.appendChild(b);
+        } else {
+            const eq = document.createElement('button');
+            eq.textContent = equipped ? '해제' : '장착';
+            eq.onclick = () => { save.equippedPet = equipped ? null : p.id; persistSave(); renderShop(); };
+            item.appendChild(eq);
+            if (owned < PET_MAX_LEVEL) {
+                const up = document.createElement('button');
+                const cost = petLevelCost(owned);
+                up.textContent = `⬆ 🪙 ${cost}`;
+                up.disabled = save.coins < cost;
+                up.onclick = () => levelUpPet(p.id);
+                item.appendChild(up);
+            } else {
+                const mx = document.createElement('button');
+                mx.textContent = 'MAX';
+                mx.disabled = true;
+                item.appendChild(mx);
+            }
+        }
+        grid.appendChild(item);
+    });
+}
+
+function buyPet(id) {
+    const p = PETS.find(x => x.id === id);
+    if (save.pets[id] || save.coins < p.price) return;
+    save.coins -= p.price;
+    save.pets[id] = 1;
+    if (!save.equippedPet) save.equippedPet = id;    // 처음 산 펫은 자동 장착
+    persistSave();
+    renderShop();
+}
+
+function levelUpPet(id) {
+    const lv = save.pets[id];
+    if (!lv || lv >= PET_MAX_LEVEL) return;
+    const cost = petLevelCost(lv);
+    if (save.coins < cost) return;
+    save.coins -= cost;
+    save.pets[id] = lv + 1;
+    persistSave();
+    renderShop();
+}
+
+function setTrainTab(tab) {
+    trainTab = tab;
+    renderShop();
+}
+
 function renderShop() {
     const grid = document.getElementById('shop-grid');
+    const note = document.getElementById('train-note');
     grid.innerHTML = '';
+    ['stats', 'char', 'pet', 'info'].forEach(t => {
+        document.getElementById('tab-' + t).style.opacity = (t === trainTab) ? '1' : '0.55';
+    });
+    if (trainTab === 'info') {
+        grid.classList.remove('hidden');
+        note.classList.add('hidden');
+        renderInfoTab(grid);
+        refreshCoinLabels();
+        return;
+    }
+    if (trainTab === 'pet') {
+        grid.classList.remove('hidden');
+        note.classList.add('hidden');
+        renderPetTab(grid);
+        refreshCoinLabels();
+        return;
+    }
+    if (trainTab === 'char') {
+        grid.classList.remove('hidden');
+        note.classList.add('hidden');
+        renderCharTab(grid);
+        refreshCoinLabels();
+        return;
+    }
+    if (trainTab !== 'stats') {
+        grid.classList.add('hidden');
+        note.classList.remove('hidden');
+        note.textContent = '';
+        refreshCoinLabels();
+        return;
+    }
+    grid.classList.remove('hidden');
+    note.classList.add('hidden');
     UPGRADES.forEach(u => {
+        if (u.city && !save.cityVisited) {
+            const locked = document.createElement('div');
+            locked.className = 'shop-item';
+            locked.innerHTML = `
+                <div class="s-icon">🔒</div>
+                <div class="s-body">
+                    <div class="s-name">${u.name}</div>
+                    <div class="s-desc">대도시 맵을 열면 해금됩니다</div>
+                </div>`;
+            const b = document.createElement('button');
+            b.textContent = '🔒';
+            b.disabled = true;
+            locked.appendChild(b);
+            grid.appendChild(locked);
+            return;
+        }
         const lv = upLv(u.id);
         const maxed = lv >= u.max;
         const cost = maxed ? 0 : upgradeCost(u, lv);
@@ -3267,6 +4217,7 @@ function renderShop() {
 function buyUpgrade(id) {
     const u = UPGRADES.find(x => x.id === id);
     const lv = upLv(id);
+    if (u.city && !save.cityVisited) return;   // 대도시 맵을 열기 전에는 구매 불가
     if (lv >= u.max) return;
     const cost = upgradeCost(u, lv);
     if (save.coins < cost) return;
@@ -3278,7 +4229,7 @@ function buyUpgrade(id) {
 
 function resetSaveData() {
     if (!confirm('코인과 모든 영구 강화, 최고 기록이 삭제됩니다. 정말 초기화할까요?')) return;
-    save = { coins: 0, upgrades: {}, bestTime: 0, bestKills: 0, bestLevel: 0, runs: 0 };
+    save = { coins: 0, upgrades: {}, bestTime: 0, bestKills: 0, bestLevel: 0, runs: 0, clearedBase: false, clearedCity: false, cityVisited: false, pets: {}, equippedPet: null, chars: {} };
     persistSave();
     renderShop();
 }
@@ -3336,7 +4287,7 @@ const UI_SCALE = IS_TOUCH_DEVICE ? 1.3 : 1;   // 모바일에서 정보 패널 �
 const ITEM_SCALE = IS_TOUCH_DEVICE ? 1.6 : 1; // 모바일에서 필드 아이템 크기 배율
 const ARROW_MAX = 4;             // 화면 밖 아이템 화살표 최대 개수
 const OUTLINE_MONSTERS = ['Violet'];  // 하얀 테두리를 씌울 몬스터 이름 목록
-const OUTLINE_WIDTH = 3;              // 테두리 두께(px)
+const OUTLINE_WIDTH = 1;              // 테두리 두께(px)
 
 // 화면을 터치한 곳에 조이스틱이 생기고, 드래그한 방향으로 이동합니다.
 const joystick = { active: false, id: null, baseX: 0, baseY: 0, knobX: 0, knobY: 0, dx: 0, dy: 0, moving: false };
@@ -3462,14 +4413,14 @@ function startPreload() {
         charImages[id] = im;
 
         const bi = new Image();
-        bi.src = c.bulletImage;
+        if (c.bulletImage) bi.src = c.bulletImage;
         charBulletImages[id] = bi;
     });
 
     const images = [
-        laserBeamImg, laserHitImg, tornadoImg, helpAngelImg, poisonImg,
-        expGemImg1, expGemImg2, expGemImg3, expGemImg4,
-        ...bgImages,
+        laserBeamImg, laserHitImg, tornadoImg, helpAngelImg, poisonImg, ...Object.values(petImgs), towerImg, boomerImg,
+        expGemImg1, expGemImg2, expGemImg3, expGemImg4, expGemImg5, expGemImg6, expGemImg7,
+        ...bgImages, ...cityBgImages,
         ...Object.values(ENEMY_IMAGES).filter(Boolean),
         ...Object.values(charImages),
         ...Object.values(charBulletImages)
@@ -3547,6 +4498,7 @@ if (IS_TOUCH_DEVICE && fullscreenSupported()) document.getElementById('fs-toggle
 fitGame();
 buildCharacterGrid();
 refreshCoinLabels();
+updateCityButton();
 document.getElementById('stats-toggle').classList.toggle('off', !showStats);
 startPreload();
 </script>
