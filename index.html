@@ -458,6 +458,10 @@
         <h2 style="color: #00ffcc; font-size: 32px; margin-bottom: 10px; text-shadow: 0 0 12px #00ffcc;">캐릭터 선택</h2>
         <p style="color: #ccc; margin-bottom: 25px;">플레이할 캐릭터를 선택해주세요</p>
         <div class="char-select-grid" id="char-grid"></div>
+        <div class="btn-row" style="margin-top: 14px;">
+            <button class="btn btn-sub" onclick="backToMapSelect()">← 뒤로가기</button>
+            <button class="btn btn-sub" onclick="goMainMenu()">🏠 메인화면</button>
+        </div>
     </div>
 
     <!-- Level Up Modal -->
@@ -640,7 +644,7 @@ const TORNADO_SPIN_SPEED = 8;
 
 // ===== 플레이어 이미지 표시 설정 =====
 // 이미지를 이 정사각형 박스 안에 '원본 비율 그대로' 맞춰서 그립니다. 크기를 바꾸려면 이 숫자만 수정하세요.
-const PLAYER_SPRITE_BOX = 90;
+const PLAYER_SPRITE_BOX = 67.5;   // 기존 90의 3/4
 // true: 부드럽게 축소(일러스트/고해상도 이미지에 적합), false: 칼같은 픽셀 유지(정확히 정수배 도트 이미지에 적합)
 const SPRITE_SMOOTHING = true;
 
@@ -1195,6 +1199,11 @@ function showAnnouncement(text, duration = 2500, isCharacter = false) {
 }
 
 
+function backToMapSelect() {
+    document.getElementById('character-select-modal').classList.add('hidden');
+    openMapSelect();
+}
+
 function openMapSelect() {
     document.getElementById('start-modal').classList.add('hidden');
     updateCityButton();
@@ -1347,6 +1356,7 @@ function startRun(charType) {
     player.floorSPD = player.speed;
     if (currentWorld === 'city') player.maxExp = CITY_EXP_START;
     cityBossKills = 0; gachaTimer = 0; roulette = null; toyTimer = 0;
+    playerAnim = { walkT: 0, atkT: -1, left: false, moving: false };
     turret = null; boomerangs = [];
     initPetRun();
     autoAttackTimer = 0;
@@ -1466,12 +1476,14 @@ function update(dt) {
         player.facingAngle = Math.atan2(dy, dx);
     }
 
+    updatePlayerAnim(dt, dx, dy);
     camera.x = player.x - canvas.width / 2;
     camera.y = player.y - canvas.height / 2;
 
     autoAttackTimer += dt * player.attackSpeedRatio;
     if (autoAttackTimer >= 1.0) {
         autoAttackTimer = 0;
+        playerAnim.atkT = 0;               // 공격 모션 시작
         fireMainProjectiles();
     }
 
@@ -3471,6 +3483,7 @@ function drawItemArrows() {
 }
 
 function drawPlayerSprite() {
+    if (drawAnimatedPlayer()) return;   // 프레임 애니메이션 캐릭터는 여기서 끝
     // 이미지의 가로/세로 비율을 계산해서, PLAYER_SPRITE_BOX 안에 찌그러짐 없이 맞춥니다.
     const ratio = playerImg.naturalWidth / playerImg.naturalHeight;
     let w, h;
@@ -3707,6 +3720,65 @@ const PET_PHONE_UNLOCK_SEC = 300;
 const PET_FOLLOW_X = 64, PET_FOLLOW_Y = 48;          // 플레이어 기준 오른쪽 하단 위치
 const PET_BOX = 52;                                   // 펫 그림 크기(px)
 const petImgs = {};
+
+// ===== 캐릭터 프레임 애니메이션 =====
+// 걷기: 오른쪽 방향 8장 (왼쪽은 좌우 반전), 공격: 4장 (공격할 때마다 한 번 재생)
+const ANIM_SETS = {
+    p3: {
+        walk: ['images/mage_walk_0.png', 'images/mage_walk_1.png', 'images/mage_walk_2.png', 'images/mage_walk_3.png',
+               'images/mage_walk_4.png', 'images/mage_walk_5.png', 'images/mage_walk_6.png', 'images/mage_walk_7.png'],
+        attack: ['images/mage_attack_0.png', 'images/mage_attack_1.png', 'images/mage_attack_2.png', 'images/mage_attack_3.png'],
+        size: 76.5         // 그려지는 크기(px). 기존 102의 3/4
+    }
+};
+const WALK_FPS = 8;                // 걷기 프레임 속도
+const ATTACK_FRAME_TIME = 0.08;    // 공격 프레임 한 장당 시간(초)
+const animImgs = {};
+Object.values(ANIM_SETS).forEach(set => [...set.walk, ...set.attack].forEach(src => {
+    const im = new Image();
+    im.src = src;
+    animImgs[src] = im;
+}));
+let playerAnim = { walkT: 0, atkT: -1, left: false, moving: false };
+
+function updatePlayerAnim(dt, dx, dy) {
+    const set = ANIM_SETS[selectedCharType];
+    playerAnim.moving = dx !== 0 || dy !== 0;
+    if (playerAnim.moving) {
+        playerAnim.walkT += dt;
+        if (dx < 0) playerAnim.left = true;
+        else if (dx > 0) playerAnim.left = false;
+    }
+    if (playerAnim.atkT >= 0 && set) {
+        playerAnim.atkT += dt;
+        if (playerAnim.atkT >= set.attack.length * ATTACK_FRAME_TIME) playerAnim.atkT = -1;
+    }
+}
+
+// 프레임 애니메이션이 있는 캐릭터는 여기서 그림. 없으면 false (기존 PNG 방식 사용)
+function drawAnimatedPlayer() {
+    const set = ANIM_SETS[selectedCharType];
+    if (!set) return false;
+    let src;
+    if (playerAnim.atkT >= 0) {
+        src = set.attack[Math.min(set.attack.length - 1, Math.floor(playerAnim.atkT / ATTACK_FRAME_TIME))];
+    } else if (playerAnim.moving) {
+        src = set.walk[Math.floor(playerAnim.walkT * WALK_FPS) % set.walk.length];
+    } else {
+        src = set.walk[0];   // 멈춰 있을 때는 첫 프레임
+    }
+    const img = animImgs[src];
+    if (!img || !img.complete || img.naturalWidth === 0) return false;
+    const s = set.size;
+    ctx.save();
+    ctx.translate(player.x, player.y);
+    if (playerAnim.left) ctx.scale(-1, 1);     // 왼쪽 이동 시 좌우 반전
+    ctx.imageSmoothingEnabled = SPRITE_SMOOTHING;
+    if (SPRITE_SMOOTHING) ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, -s / 2, -s / 2, s, s);
+    ctx.restore();
+    return true;
+}
 const towerImg = new Image();
 towerImg.src = 'images/tower_a.png';
 const boomerImg = new Image();
@@ -4000,33 +4072,72 @@ function closeShop() {
     refreshCoinLabels();
 }
 
-// 캐릭터별 기본 능력치 계산 (현재 강화 수치 반영)
-function computeCharStats(id) {
+
+// 펫 효과 요약 (내 정보용)
+function petEffectText(id, lv) {
+    if (id === 'phone') return `300초 후 1판 ${petPhoneCharges(lv)}회 · 보스 ${Math.round(petPhoneBossRatio(lv) * 100)}% 감소`;
+    if (id === 'nero') return `피해·공속 ×${petNeroMult(lv).toFixed(1)}`;
+    if (id === 'duck') return `60초마다 ${petDuckDuration(lv).toFixed(1)}초 무적`;
+    if (id === 'bread') return `30초마다 체력 +${petBreadHeal(lv)}`;
+    return '';
+}
+
+// 플레이어가 현재 가진 전체 능력치 (선택한 캐릭터 + 개인 훈련 강화 + 장착 펫)
+function computePlayerStats(id) {
     const c = CHARACTERS[id];
     const atk = 25 * c.attackMult * (1 + 0.04 * upLv('power')) * (1 + 0.02 * upLv('atk2'));
     const asr = c.attackSpeed * (1 + 0.03 * upLv('atkspeed'));
     const spd = BASE_PLAYER_SPEED * c.moveMult * (1 + 0.02 * upLv('move'));
     const hp = 100 + (c.hpBonus || 0) + 8 * upLv('hp');
     const crit = c.crit + CRIT_SHOP_TOTAL[Math.min(upLv('crit'), CRIT_SHOP_TOTAL.length - 1)] / 100 + 0.02 * upLv('crit2');
-    const critDmg = CRIT_BASE_MULT + (c.critDmgBonus || 0) / 100 + 0.02 * upLv('critdmg2');   // 치명타 배율
-    return { atk, asr, spd, hp, crit, cards: c.cardChoices, shots: 1 + (c.extraBullets || 0), pierce: c.pierce, critDmg };
+    const critDmg = CRIT_BASE_MULT + (c.critDmgBonus || 0) / 100 + 0.02 * upLv('critdmg2');
+    const expMult = (1 + 0.05 * upLv('exp')) * (c.passive === 'curiosity' ? 1.15 : 1);
+    const coinMult = (1 + 0.10 * upLv('coin')) * (c.passive === 'dog' ? 1.15 : 1);
+    const petId = save.equippedPet && save.pets[save.equippedPet] ? save.equippedPet : null;
+    const petLv = petId ? save.pets[petId] : 0;
+    const petName = petId ? PETS.find(p => p.id === petId).name : '없음';
+    const passiveName = { curiosity: '🎈 호기심', doctor: '🩹 응급처치', dog: '🦴 충성', rabbit: '🥕 당근' }[c.passive] || '없음';
+    return [
+        ['⚔️ 공격력', atk.toFixed(1)],
+        ['⚡ 공격 속도', asr.toFixed(2) + '/초'],
+        ['🏃 이동 속도', spd.toFixed(2)],
+        ['❤️ 최대 체력', Math.round(hp)],
+        ['🎯 치명타 확률', Math.round(crit * 100) + '%'],
+        ['💢 치명타 피해', Math.round(critDmg * 100) + '%'],
+        ['🏹 투사체', (1 + (c.extraBullets || 0)) + '개'],
+        ['🗡️ 관통', c.pierce + '회'],
+        ['🃏 레벨업 카드', c.cardChoices + '장'],
+        ['📘 경험치 획득', Math.round(expMult * 100) + '%'],
+        ['🪙 코인 획득', Math.round(coinMult * 100) + '%'],
+        ['🧲 자석 범위', (100 + 10 * upLv('magnet')) + 'px'],
+        ['🛡️ 받는 피해', Math.round((1 - 0.04 * upLv('armor')) * 100) + '%'],
+        ['🩸 생명력 흡수', `${5 * upLv('lifesteal')}% 확률 · 체력 +${upLv('lifesteal')}`],
+        ['✨ 부활', upLv('revive') + '회'],
+        ['🎈 패시브', passiveName],
+        ['🐾 펫', petId ? `${petName} Lv.${petLv} (${petEffectText(petId, petLv)})` : '없음'],
+    ];
 }
 
 function renderInfoTab(grid) {
     grid.innerHTML = '';
-    Object.entries(CHARACTERS).forEach(([id, c]) => {
-        const owned = isCharOwned(id);
-        const st = computeCharStats(id);
+    const c = CHARACTERS[selectedCharType];
+    const head = document.createElement('div');
+    head.className = 'shop-item';
+    head.style.gridColumn = '1 / -1';
+    head.innerHTML = `
+        <div class="s-icon">${c.icon}</div>
+        <div class="s-body">
+            <div class="s-name">${c.name} · 현재 플레이어 능력치</div>
+            <div class="s-desc">선택한 캐릭터 기준 · 강화와 장착 펫이 반영된 값이에요</div>
+        </div>`;
+    grid.appendChild(head);
+    computePlayerStats(selectedCharType).forEach(([label, value]) => {
         const item = document.createElement('div');
         item.className = 'shop-item';
-        item.style.alignItems = 'flex-start';
         item.innerHTML = `
-            <div class="s-icon">${owned ? c.icon : '🔒'}</div>
             <div class="s-body">
-                <div class="s-name">${c.name}${owned ? '' : ' (미보유)'}</div>
-                <div class="s-desc">⚔️ 공격력 ${st.atk.toFixed(1)} · ⚡ 공격속도 ${st.asr.toFixed(2)}/초 · 🏃 이동속도 ${st.spd.toFixed(2)}</div>
-                <div class="s-desc">❤️ 최대 체력 ${Math.round(st.hp)} · 🎯 치명타 ${Math.round(st.crit * 100)}% (피해 ${(st.critDmg * 100).toFixed(0)}%) · 🏹 투사체 ${st.shots} · 🗡️ 관통 ${st.pierce}</div>
-                <div class="s-desc">🃏 레벨업 카드 ${st.cards}장 · ${c.ability}</div>
+                <div class="s-name">${label}</div>
+                <div class="s-lv" style="font-size: 14px; color: #fff;">${value}</div>
             </div>`;
         grid.appendChild(item);
     });
@@ -4418,7 +4529,7 @@ function startPreload() {
     });
 
     const images = [
-        laserBeamImg, laserHitImg, tornadoImg, helpAngelImg, poisonImg, ...Object.values(petImgs), towerImg, boomerImg,
+        laserBeamImg, laserHitImg, tornadoImg, helpAngelImg, poisonImg, ...Object.values(petImgs), towerImg, boomerImg, ...Object.values(animImgs),
         expGemImg1, expGemImg2, expGemImg3, expGemImg4, expGemImg5, expGemImg6, expGemImg7,
         ...bgImages, ...cityBgImages,
         ...Object.values(ENEMY_IMAGES).filter(Boolean),
