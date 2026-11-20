@@ -414,6 +414,41 @@
         }
         #turret-btn:disabled { opacity: 0.45; cursor: not-allowed; }
         #turret-btn:not(:disabled):hover { background: rgba(255,255,255,0.18); }
+
+        /* ===== v54: 게임오버 창 화면 크기 대응 (모바일 가로 화면에서도 메뉴 3개가 한 화면에) ===== */
+        #gameover-modal { justify-content: center; padding: 8px; box-sizing: border-box; overflow-y: auto; }
+        #gameover-title { font-size: clamp(26px, 7vh, 42px) !important; margin: 0 !important; line-height: 1.1; }
+        #final-stats { font-size: clamp(12px, 2.8vh, 16px) !important; margin: clamp(2px, 0.8vh, 4px) 0 clamp(4px, 1.2vh, 10px) !important; }
+        #reward-box {
+            min-width: 0 !important; width: min(340px, 92%); box-sizing: border-box;
+            padding: clamp(4px, 1.2vh, 10px) 16px !important;
+            margin-bottom: clamp(6px, 1.6vh, 14px) !important;
+            font-size: clamp(11px, 2.4vh, 14px); line-height: 1.5 !important;
+        }
+        #gameover-modal .btn-row { margin-top: 0; gap: clamp(6px, 1.5vw, 12px); }
+        #gameover-modal .btn { padding: clamp(6px, 1.4vh, 12px) clamp(12px, 3vw, 32px) !important; font-size: clamp(13px, 2.8vh, 18px) !important; }
+        #gameover-modal .btn-sub { padding: clamp(6px, 1.4vh, 10px) clamp(10px, 2.4vw, 22px) !important; font-size: clamp(12px, 2.6vh, 15px) !important; }
+        /* ===== v57: 모든 창을 화면에 맞추고, 넘치면 스크롤 (잘린 메뉴 방지) ===== */
+        .modal { justify-content: safe center; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 8px 0; box-sizing: border-box; }
+        #gameover-modal, #levelup-modal, #pause-modal, #menu-modal, #map-modal, #character-select-modal, #shop-modal { touch-action: pan-y; }
+        @media (pointer: coarse) and (max-height: 520px) {
+            .modal h1 { font-size: clamp(22px, 6vh, 34px) !important; }
+            .modal h2 { font-size: clamp(18px, 5vh, 28px) !important; margin: 0 0 4px !important; }
+            .modal p { margin: 2px 0 6px !important; font-size: clamp(11px, 2.4vh, 14px) !important; }
+            .modal .btn { padding: clamp(5px, 1.3vh, 10px) clamp(12px, 3vw, 28px) !important; font-size: clamp(12px, 2.6vh, 16px) !important; }
+            .modal .btn-sub { padding: clamp(5px, 1.2vh, 9px) clamp(10px, 2.4vw, 20px) !important; font-size: clamp(11px, 2.4vh, 14px) !important; }
+            .modal .btn-row { margin-top: 4px; gap: 6px; }
+        }
+        /* ===== v58: 캐릭터 선택 카드 이미지 (모두 같은 크기) ===== */
+        .char-select-card .character-img {
+            width: clamp(44px, 9vh, 72px);
+            height: clamp(44px, 9vh, 72px);
+            object-fit: contain;
+            display: block;
+            margin: 0 auto clamp(2px, 0.6vh, 6px);
+        }
+        .char-select-card .character-img.locked-img { filter: grayscale(1) brightness(0.5); }
+        .char-select-card .character-img.locked-img + .character-icon { font-size: clamp(16px, 3.5vh, 22px); margin-bottom: 2px; }
     </style>
 </head>
 <body>
@@ -587,14 +622,14 @@ const CITY_STAGE_MONSTERS = [
 
 // ===== 대도시 보스 (10·20·30·45레벨) =====
 const CITY_BOSS_LEVELS = [10, 20, 30, 45];
-const CITY_BOSS_STAGE = { 10: 1, 20: 2, 30: 3, 45: 4 };      // 보스 등장 시 바뀌는 배경 번호
+// 대도시 배경은 플레이어 레벨 기준으로 바뀜 (cityLevelStage 참고)
 const CITY_BOSS_NAMES = { 10: '단소 살인마', 20: '취해버린 부장 좀비', 30: '유혹의 가챠 기계', 45: '동네 유치원생' };
 const CITY_BOSS_STATS = {
     // minHp/seconds: 체력 = max(minHp, seconds × 플레이어 기본공격 초당 화력)
     10: { minHp: 15000, seconds: 50, speed: 0.60, contact: 30, bullets: 10, interval: 2.4, bulletDmg: 14, bulletSpeed: 3.0, sprite: 'CityBoss10' },
     20: { minHp: 25000, seconds: 60, speed: 0.65, contact: 35, bullets: 10, interval: 1.4, bulletDmg: 18, bulletSpeed: 4.0, sprite: 'CityBoss20' },
     30: { minHp: 30000, seconds: 65, speed: 0.50, contact: 35, bullets: 0,  interval: 0,   bulletDmg: 0,  bulletSpeed: 0,   sprite: 'CityBoss30' },
-    45: { minHp: 80000, seconds: 100, speed: 0.45, contact: 50, bullets: 0, interval: 0, bulletDmg: 0, bulletSpeed: 0, sprite: 'CityBoss45' }
+    45: { minHp: 160000, seconds: 200, speed: 0.45, contact: 50, bullets: 0, interval: 0, bulletDmg: 0, bulletSpeed: 0, sprite: 'CityBoss45' }
 };
 const CITY_CLEAR_BOSS_COUNT = 4;   // 시티보스 4마리를 모두 처치하면 클리어
 let cityBossKills = 0;
@@ -1272,7 +1307,7 @@ const CHARACTERS = {
         passive: 'doctor', price: 1500
     },
     p8: {
-        name: '강아지', icon: '🐶', image: 'images/player7.png', bulletImage: 'images/attack_7.png',
+        name: '성직자', icon: '🐶', image: 'images/player7.png', bulletImage: 'images/attack_7.png',
         attackMult: 1.10, attackSpeed: 1.0, moveMult: 1.15, pierce: 1, hpBonus: -15, critDmgBonus: 20,
         splash: false, splashRadius: 1.0, crit: 0, startSkills: {}, cardChoices: 3,
         ability: '🦴 충성: 코인 획득량 +15% / 치명타 피해 +20% / 이동 +15%', drawback: '최대 체력 -15',
@@ -1304,13 +1339,14 @@ function buildCharacterGrid() {
         card.tabIndex = 0;
         card.setAttribute('role', 'button');
         card.innerHTML = `
-            <div class="character-icon">${c.icon}</div>
+            <img class="character-img" src="${c.image}" alt="${c.name}">
             <div class="character-name">${c.name}</div>
             <div class="character-ability">${c.ability}</div>
             <div class="character-drawback">${c.drawback}</div>`;
         if (!isCharOwned(id)) {
             card.classList.add('locked');
             card.innerHTML = `
+                <img class="character-img locked-img" src="${c.image}" alt="${c.name}">
                 <div class="character-icon">🔒</div>
                 <div class="character-name">${c.name}</div>
                 <div class="character-ability">개인 훈련에서 🪙 ${c.price} 에 구매</div>`;
@@ -1443,7 +1479,11 @@ function gameLoop(timestamp) {
     lastTime = timestamp;
 
     if (gameState === 'PLAYING' && !isPortraitBlocked()) {
-        update(dt);   // 모바일 세로 모드일 때는 가로 모드 안내가 뜨는 동안 일시정지
+        if (roulette && roulette.phase === 'spin') {
+            updateRoulette(dt);   // 🎰 룰렛이 도는 동안: 게임 전체 정지, 룰렛 연출만 진행
+        } else {
+            update(dt);           // 모바일 세로 모드일 때는 가로 모드 안내가 뜨는 동안 일시정지
+        }
     }
     render();
 
@@ -2136,7 +2176,6 @@ function spawnCityBoss(level) {
     const bs = CITY_BOSS_STATS[level];
     showAnnouncement(`⚠️ [Lv.${level}] ${CITY_BOSS_NAMES[level]} 등장! ⚠️`, 3000);
     SFX.play('boss');
-    setBackgroundStage(CITY_BOSS_STAGE[level]);
 
     const angle = Math.random() * Math.PI * 2;
     const hp = Math.max(bs.minHp, Math.round(bs.seconds * playerMainDps()));
@@ -2159,10 +2198,10 @@ function spawnCityBoss(level) {
 
 function onCityBossKilled(e) {
     cityBossKills++;
+    if (e.bossLevel === 45) setBackgroundStage(5);   // 45레벨 보스 처치 → 마지막 배경 (backg_city5)
     player.hp = Math.min(player.maxHp, player.hp + 30);
     if (cityBossKills >= CITY_CLEAR_BOSS_COUNT) {
         recordClear();
-        setBackgroundStage(5);   // 클리어 후 마지막 배경 (City9 등장)
         showAnnouncement('🏆 대도시 클리어! (우측 하단 버튼으로 종료)', 4000);
     } else {
         showAnnouncement(`🎉 ${CITY_BOSS_NAMES[e.bossLevel]} 처치! HP 30 회복`);
@@ -2194,8 +2233,19 @@ function spawnToys() {
 }
 
 // 대도시 보스 시간 로직: 가챠기계 룰렛 / 유치원생 스폰
+function cityLevelStage(level) {
+    if (level >= 40) return 4;
+    if (level >= 30) return 3;
+    if (level >= 20) return 2;
+    if (level >= 10) return 1;
+    return 0;
+}
+
 function updateCityBosses(dt) {
     if (currentWorld !== 'city') return;
+    // 배경은 10레벨 단위로 바뀜 (0~9: 0 / 10~19: 1 / 20~29: 2 / 30~39: 3 / 40~: 4). 45레벨 보스 처치 후에는 5
+    const target = cityLevelStage(player.level);
+    if (target > bgStage && bgStage < 5) setBackgroundStage(target);
     if (enemies.some(e => e.cityBoss && e.bossLevel === 30)) {
         gachaTimer += dt;
         if (!roulette && gachaTimer >= GACHA_INTERVAL) {
@@ -3067,7 +3117,8 @@ function updateItemsAndGems(dt) {
 }
 
 function addExp(val) {
-    player.exp += val * player.expMult;
+    const bonus = (currentWorld === 'base' && player.level >= 55) ? 1.5 : 1;   // 황궁 던전 55레벨 이상: 경험치 1.5배
+    player.exp += val * player.expMult * bonus;
     if (player.exp >= player.maxExp) {
         player.exp -= player.maxExp;
         player.level++;
@@ -3344,7 +3395,7 @@ function render() {
 
     // 🧙‍♂️ 캐릭터 렌더링 (이미지 원본 비율 유지)
     ctx.save();
-    if (playerImg.complete && playerImg.naturalWidth !== 0) {
+    if (ANIM_SETS[selectedCharType] || (playerImg.complete && playerImg.naturalWidth !== 0)) {
         drawPlayerSprite();
     } else {
         ctx.fillStyle = '#00ffcc';
@@ -3493,7 +3544,13 @@ function drawPlayerSprite() {
     ctx.save();
     ctx.imageSmoothingEnabled = SPRITE_SMOOTHING;
     if (SPRITE_SMOOTHING) ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(playerImg, player.x - w / 2, player.y - h / 2, w, h);
+    if (playerAnim.left) {                  // 왼쪽 이동 시 좌우 반전 (프레임 캐릭터와 동일)
+        ctx.translate(player.x, player.y);
+        ctx.scale(-1, 1);
+        ctx.drawImage(playerImg, -w / 2, -h / 2, w, h);
+    } else {
+        ctx.drawImage(playerImg, player.x - w / 2, player.y - h / 2, w, h);
+    }
     ctx.restore();
 }
 
@@ -3724,11 +3781,31 @@ const petImgs = {};
 // ===== 캐릭터 프레임 애니메이션 =====
 // 걷기: 오른쪽 방향 8장 (왼쪽은 좌우 반전), 공격: 4장 (공격할 때마다 한 번 재생)
 const ANIM_SETS = {
+    // 공듀(p1): 걷기 7장 + 공격 4장 (원본 256px → 67.5px)
+    p1: {
+        walk: ['images/princess_walk_0.png', 'images/princess_walk_1.png', 'images/princess_walk_2.png', 'images/princess_walk_3.png',
+               'images/princess_walk_4.png', 'images/princess_walk_5.png', 'images/princess_walk_6.png'],
+        attack: ['images/princess_attack_0.png', 'images/princess_attack_1.png', 'images/princess_attack_2.png', 'images/princess_attack_3.png'],
+        size: 67.5
+    },
+    // 왕자(완댜 p2): 기본/걷기 1장(prince_walk.png) + 공격 4장
+    p2: {
+        walk: ['images/prince_walk.png'],
+        attack: ['images/prince_attack_0.png', 'images/prince_attack_1.png', 'images/prince_attack_2.png', 'images/prince_attack_3.png'],
+        size: 67.5
+    },
+    // 법사(p3): 기본/걷기 1장(magic_walk.png) + 공격 4장
     p3: {
+        walk: ['images/magic_walk.png'],
+        attack: ['images/magic_attack_0.png', 'images/magic_attack_1.png', 'images/magic_attack_2.png', 'images/magic_attack_3.png'],
+        size: 76.5
+    },
+    // player7 이미지를 쓰는 캐릭터(강아지 p8): 기존 mage 걷기 8장 + 공격 4장
+    p8: {
         walk: ['images/mage_walk_0.png', 'images/mage_walk_1.png', 'images/mage_walk_2.png', 'images/mage_walk_3.png',
                'images/mage_walk_4.png', 'images/mage_walk_5.png', 'images/mage_walk_6.png', 'images/mage_walk_7.png'],
         attack: ['images/mage_attack_0.png', 'images/mage_attack_1.png', 'images/mage_attack_2.png', 'images/mage_attack_3.png'],
-        size: 76.5         // 그려지는 크기(px). 기존 102의 3/4
+        size: 76.5
     }
 };
 const WALK_FPS = 8;                // 걷기 프레임 속도
@@ -3767,8 +3844,9 @@ function drawAnimatedPlayer() {
     } else {
         src = set.walk[0];   // 멈춰 있을 때는 첫 프레임
     }
-    const img = animImgs[src];
-    if (!img || !img.complete || img.naturalWidth === 0) return false;
+    let img = animImgs[src];
+    if (!img || !img.complete || img.naturalWidth === 0) img = animImgs[set.walk[0]];   // 이 프레임이 없으면 기본 자세
+    if (!img || !img.complete || img.naturalWidth === 0) return true;                   // 아무 프레임도 없으면 그리지 않음 (기존 PNG로 되돌아가지 않음)
     const s = set.size;
     ctx.save();
     ctx.translate(player.x, player.y);
@@ -3993,6 +4071,8 @@ function recordClear() {
 
 // 클리어 전이면 현재 기록, 클리어 후면 처치 직후 기록을 사용
 function getRunStats() {
+    // 대도시는 클리어 후에도 몬스터를 잡으면 코인을 계속 얻음 (처치 수는 실시간, 나머지는 클리어 시점 기록)
+    if (clearSnapshot && currentWorld === 'city') return { ...clearSnapshot, kills: killCount };
     return clearSnapshot || { time: Math.floor(gameTime), kills: killCount, level: player.level, bossKills: bossKills };
 }
 
