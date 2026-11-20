@@ -3362,6 +3362,8 @@ function render() {
         ctx.fill();
     });
 
+    drawPoisons();         // ☠️ 독 구름 (몬스터·캐릭터보다 아래)
+
     enemies.forEach(e => {
         // 표시 크기만 PNG 크기로 변경합니다. 충돌/공격 판정 반경은 기존 값 그대로입니다.
         const radius = e.isBoss ? 28 : e.tier.radius;
@@ -3405,16 +3407,26 @@ function render() {
     }
 
     if (player.invincibleTimer > 0) {
-        ctx.strokeStyle = 'rgba(255, 0, 85, 0.85)';
-        ctx.lineWidth = 3;
+        // 밝은 글로우: 바깥으로 갈수록 옅은 원을 겹쳐서 빛나는 느낌 (그림자 효과 없이 가볍게)
+        const pulse = 0.8 + 0.2 * Math.sin(gameTime * 14);
+        ctx.fillStyle = '#bfefff';
+        [[30, 0.10], [24, 0.14], [18, 0.2], [13, 0.28]].forEach(([r, a]) => {
+            ctx.globalAlpha = a * pulse;
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, r, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        ctx.globalAlpha = 0.9 * pulse;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.arc(player.x, player.y, player.radius + 6, 0, Math.PI * 2);
+        ctx.arc(player.x, player.y, 16, 0, Math.PI * 2);
         ctx.stroke();
+        ctx.globalAlpha = 1;
     }
     ctx.restore();
 
     drawHelper();          // 👼 아군 천사
-    drawPoisons();         // ☠️ 독 구름
     drawFreezeEffects();   // ❄️ 빙결 파동 / 얼음 상태
     drawTurretAndBoomerangs();   // 🗼 포탑 / 🪃 부메랑 (월드 좌표)
     drawPet();            // 🐾 펫 (월드 좌표, 플레이어 오른쪽 대각선 아래)
@@ -3763,13 +3775,13 @@ let trainTab = 'stats';
 
 // ===== 펫 (1마리 장착, 플레이어 오른쪽 하단을 따라다님) =====
 const PETS = [
-    { id: 'phone', name: '스마트폰', icon: '📱', img: 'images/pet1.png', price: 5500,
+    { id: 'phone', name: '스마트폰', icon: '📱', img: 'images/pet1.png', price: 55,
       desc: '300초 이후 맵의 모든 적 처치 (보스는 체력 70% 감소, 레벨당 +3%p). 1판 1회, 5레벨부터 2회.' },
-    { id: 'nero',  name: '네로',     icon: '🐶', img: 'images/pet2.png', price: 6000,
+    { id: 'nero',  name: '네로',     icon: '🐶', img: 'images/pet2.png', price: 60,
       desc: '공격력 0.5배 피해로 적을 공격. 공격속도는 플레이어 공격속도의 0.5배.' },
-    { id: 'duck',  name: '오리',     icon: '🦆', img: 'images/pet3.png', price: 3000,
+    { id: 'duck',  name: '오리',     icon: '🦆', img: 'images/pet3.png', price: 30,
       desc: '60초마다 3초 무적.' },
-    { id: 'bread', name: '붕어빵',   icon: '🐟', img: 'images/pet4.png', price: 4500,
+    { id: 'bread', name: '붕어빵',   icon: '🐟', img: 'images/pet4.png', price: 45,
       desc: '30초마다 체력 5 회복.' }
 ];
 const PET_MAX_LEVEL = 5;
@@ -3806,6 +3818,12 @@ const ANIM_SETS = {
                'images/mage_walk_4.png', 'images/mage_walk_5.png', 'images/mage_walk_6.png', 'images/mage_walk_7.png'],
         attack: ['images/mage_attack_0.png', 'images/mage_attack_1.png', 'images/mage_attack_2.png', 'images/mage_attack_3.png'],
         size: 76.5
+    },
+    // 어린이(p6, 이미지 player5): 기본/걷기 1장(player5.png) + 공격 4장(player5_attack_0~3)
+    p6: {
+        walk: ['images/player5.png'],
+        attack: ['images/player5_attack_0.png', 'images/player5_attack_1.png', 'images/player5_attack_2.png', 'images/player5_attack_3.png', 'images/player5_attack_4.png'],
+        size: 67.5
     }
 };
 const WALK_FPS = 8;                // 걷기 프레임 속도
